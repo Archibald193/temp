@@ -1,0 +1,17 @@
+#define F_CPU 8000000UL
+#include <avr/io.h>
+#include <avr/interrupt.h>
+ISR(TIMER1_COMPA_vect) {
+    PORTB ^= (1 << 0);
+}
+
+int main(void) {
+    DDRB = (1 << 0);
+    OCR1A = 39999;
+    TCCR1B |= (1 << WGM12);
+    TCCR1B |= (1 << CS11);
+    TIMSK |= (1 << OCIE1A);
+    sei();
+    while (1) {
+    }
+}
