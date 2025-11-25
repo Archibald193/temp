@@ -1,0 +1,76 @@
+#define F_CPU 8000000UL // Частота 8 МГц
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+// Скорость передачи данных (стандартная)
+#define BAUD 9600
+// Формула расчета значения для регистра скорости (из даташита)
+#define MYUBRR F_CPU/16/BAUD-1
+
+// --- Инициализация USART ---
+void USART_Init(unsigned int ubrr) {
+    // 1. Задаем скорость передачи
+    UBRRH = (unsigned char)(ubrr >> 8);
+    UBRRL = (unsigned char)ubrr;
+    
+    // 2. Включаем приемник (RXEN) и передатчик (TXEN)
+    UCSRB = (1 << RXEN) | (1 << TXEN);
+    
+    // 3. Формат кадра: 8 бит данных, 1 стоп-бит (8N1)
+    // URSEL нужно для доступа к UCSRC на ATtiny2313 (важный нюанс!)
+    // UCSZ1 и UCSZ0 задают 8 бит
+    UCSRC = (0 << USBS) | (1 << UCSZ1) | (1 << UCSZ0);
+}
+
+// --- Функция отправки байта (символа) ---
+void USART_Transmit(unsigned char data) {
+    // Ждем, пока буфер передатчика не освободится
+    while (!(UCSRA & (1 << UDRE)));
+    
+    // Кладем данные в буфер, отправка начнется сама
+    UDR = data;
+}
+
+// --- Функция приема байта (символа) ---
+unsigned char USART_Receive(void) {
+    // Ждем, пока придут какие-то данные
+    while (!(UCSRA & (1 << RXC)));
+    
+    // Возвращаем полученные данные
+    return UDR;
+}
+
+int main(void) {
+    // Настройка порта B на выход (для светодиодов)
+    DDRB = 0xFF; 
+    PORTB = 0x00; // Гасим всё
+
+    // Запускаем USART со скоростью 9600
+    USART_Init(MYUBRR);
+
+    // Отправляем приветственное сообщение
+    USART_Transmit('O');
+    USART_Transmit('K');
+    USART_Transmit('!');
+    USART_Transmit('\r'); // Перенос строки
+    USART_Transmit('\n');
+
+    unsigned char received_char;
+
+    while (1) {
+        // 1. Ждем и читаем символ от компьютера
+        received_char = USART_Receive();
+
+        // 2. Отправляем этот же символ обратно (Эхо), чтобы видеть его в терминале
+        USART_Transmit(received_char);
+
+        // 3. Управление светодиодами
+        if (received_char == '1') {
+            PORTB = 0xFF; // Зажечь всё (или конкретный диод)
+        } 
+        else if (received_char == '0') {
+            PORTB = 0x00; // Погасить всё
+        }
+    }
+}
