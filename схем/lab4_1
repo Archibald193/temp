@@ -1,0 +1,125 @@
+#define F_CPU 8000000UL // 8 МГц
+
+#include <avr/io.h>
+#include <util/delay.h>
+
+// --- НАСТРОЙКИ ПОДКЛЮЧЕНИЯ LCD ---
+// Шина данных (4 бита) на Порту B (старшая половина)
+#define LCD_DATA_PORT PORTB
+#define LCD_DATA_DDR  DDRB
+
+// Линии управления на Порту D
+#define LCD_CTRL_PORT PORTD
+#define LCD_CTRL_DDR  DDRD
+#define LCD_RS        PD4
+#define LCD_RW        PD5
+#define LCD_E         PD6
+
+// --- ФУНКЦИИ БИБЛИОТЕКИ (Взяты из методички и упрощены) ---
+
+// Посылает импульс на линию E ("защелкивает" данные)
+void LCD_PulseEnable(void) {
+    LCD_CTRL_PORT |= (1 << LCD_E);  // E = 1
+    _delay_us(1);                   // Ждем
+    LCD_CTRL_PORT &= ~(1 << LCD_E); // E = 0
+    _delay_us(50);                  // Пауза
+}
+
+// Отправляет 4 бита данных
+void LCD_SendNibble(uint8_t nibble) {
+    // Очищаем старшие 4 бита порта B и записываем туда наши данные
+    LCD_DATA_PORT &= 0x0F;          
+    LCD_DATA_PORT |= (nibble & 0xF0); 
+    LCD_PulseEnable();
+}
+
+// Отправляет байт (команду или данные) в два приема (по 4 бита)
+// is_data = 0 (Команда), is_data = 1 (Данные/Буква)
+void LCD_SendByte(uint8_t data, uint8_t is_data) {
+    if (is_data) {
+        LCD_CTRL_PORT |= (1 << LCD_RS); // RS = 1 (Данные)
+    } else {
+        LCD_CTRL_PORT &= ~(1 << LCD_RS); // RS = 0 (Команда)
+    }
+    
+    LCD_CTRL_PORT &= ~(1 << LCD_RW); // RW = 0 (Запись)
+
+    // Отправляем старшие 4 бита
+    LCD_SendNibble(data);
+    
+    // Отправляем младшие 4 бита (сдвигаем их на место старших)
+    LCD_SendNibble(data << 4);
+}
+
+// Инициализация дисплея (настройка 4-битного режима)
+void LCD_Init(void) {
+    // Настройка портов на выход
+    LCD_DATA_DDR |= 0xF0; // PB4-PB7 выходы
+    LCD_CTRL_DDR |= (1<<LCD_RS)|(1<<LCD_RW)|(1<<LCD_E); // PD4-PD6 выходы
+
+    _delay_ms(20); // Ждем включения питания
+
+    // Магическая последовательность для включения 4-битного режима
+    LCD_CTRL_PORT &= ~(1 << LCD_RS);
+    LCD_CTRL_PORT &= ~(1 << LCD_RW);
+    
+    LCD_SendNibble(0x30); _delay_ms(5);
+    LCD_SendNibble(0x30); _delay_us(100);
+    LCD_SendNibble(0x30); _delay_us(100);
+    LCD_SendNibble(0x20); _delay_us(100); // Переход в 4-битный режим
+
+    // Настройка параметров
+    LCD_SendByte(0x28, 0); // 4 бита, 2 строки, шрифт 5x8
+    LCD_SendByte(0x0C, 0); // Включить дисплей, без курсора
+    LCD_SendByte(0x06, 0); // Курсор сдвигается вправо
+    LCD_SendByte(0x01, 0); // Очистить дисплей
+    _delay_ms(2);
+}
+
+// Вывод строки текста
+void LCD_String(char *str) {
+    while (*str) {
+        LCD_SendByte(*str, 1); // 1 значит "данные"
+        str++;
+    }
+}
+
+// Установка курсора (строка 0 или 1, позиция 0-15)
+void LCD_Goto(uint8_t row, uint8_t col) {
+    uint8_t address;
+    if (row == 0) address = 0x80 + col;
+    else          address = 0xC0 + col;
+    LCD_SendByte(address, 0);
+}
+
+// --- ОСНОВНАЯ ПРОГРАММА ---
+
+int main(void) {
+    LCD_Init(); // Запускаем экран
+
+    while (1) {
+        // 1. Очищаем экран
+        LCD_SendByte(0x01, 0); 
+        _delay_ms(2);
+
+        // 2. Выводим "Hello World"
+        LCD_Goto(0, 0);       // 1-я строка, начало
+        LCD_String("Hello");
+        LCD_Goto(1, 0);       // 2-я строка, начало
+        LCD_String("World!");
+        
+        _delay_ms(2000); // Ждем 2 секунды
+
+        // 3. Очищаем экран
+        LCD_SendByte(0x01, 0);
+        _delay_ms(2);
+
+        // 4. Выводим "Slava KPSS" (по-английски, т.к. русский шрифт сложнее)
+        LCD_Goto(0, 2);       // 1-я строка, чуть правее
+        LCD_String("Slava");
+        LCD_Goto(1, 2);       // 2-я строка
+        LCD_String("KPSS!");
+
+        _delay_ms(2000); // Ждем 2 секунды
+    }
+}
