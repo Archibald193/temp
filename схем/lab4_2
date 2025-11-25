@@ -45,28 +45,34 @@ void LCD_SendByte(uint8_t data, uint8_t is_data) {
     LCD_SendNibble(data << 4);
 }
 
+// ... (остальной код оставь как был) ...
+
 void LCD_Init(void) {
-    LCD_DATA_DDR |= 0xF0; // PB4-PB7 на выход
-    LCD_CTRL_DDR |= (1<<LCD_RS)|(1<<LCD_RW)|(1<<LCD_E); // PD4-PD6 на выход
+    LCD_DATA_DDR |= 0xF0; 
+    LCD_CTRL_DDR |= (1<<LCD_RS)|(1<<LCD_RW)|(1<<LCD_E); 
 
-    _delay_ms(50); // Ждем, пока экран "проснется" после подачи питания
+    // !!! УВЕЛИЧИЛИ ЗАДЕРЖКУ !!!
+    _delay_ms(100); // Ждем дольше, пока экран включится
 
-    // Сброс настроек экрана (магическая последовательность)
     LCD_CTRL_PORT &= ~(1 << LCD_RS);
     LCD_CTRL_PORT &= ~(1 << LCD_RW);
     LCD_CTRL_PORT &= ~(1 << LCD_E);
     
-    LCD_SendNibble(0x30); _delay_ms(5);
-    LCD_SendNibble(0x30); _delay_us(150);
-    LCD_SendNibble(0x30); _delay_us(150);
-    LCD_SendNibble(0x20); _delay_us(150); // Переключаем в 4-битный режим
+    // Три раза шлем 0x30 для сброса (согласно даташиту)
+    LCD_SendNibble(0x03); _delay_ms(10);
+    LCD_SendNibble(0x03); _delay_ms(2);
+    LCD_SendNibble(0x03); _delay_ms(2);
+    
+    LCD_SendNibble(0x02); _delay_ms(2); // Переключаем в 4-битный режим
 
-    // Настройка параметров отображения
     LCD_SendByte(0x28, 0); // 4 бита, 2 строки
-    LCD_SendByte(0x0C, 0); // Дисплей ВКЛ, курсор ВЫКЛ
-    LCD_SendByte(0x06, 0); // Курсор едет вправо
-    LCD_SendByte(0x01, 0); // Очистить экран
-    _delay_ms(20);
+    _delay_ms(2);
+    LCD_SendByte(0x0C, 0); // Дисплей ВКЛ
+    _delay_ms(2);
+    LCD_SendByte(0x06, 0); // Курсор вправо
+    _delay_ms(2);
+    LCD_SendByte(0x01, 0); // Очистка
+    _delay_ms(20); // Долгая пауза после очистки
 }
 
 void LCD_String(char *str) {
@@ -86,31 +92,23 @@ void LCD_Goto(uint8_t row, uint8_t col) {
 
 // --- ГЛАВНАЯ ПРОГРАММА ---
 int main(void) {
-    LCD_Init(); // Инициализация экрана
+    LCD_Init(); 
 
     while (1) {
-        // Очистка
-        LCD_SendByte(0x01, 0); 
+        LCD_SendByte(0x01, 0); // Очистка
         _delay_ms(20);
-
-        // Вывод текста 1
+        
         LCD_Goto(0, 0);
         LCD_String("Hello");
-        LCD_Goto(1, 0);
-        LCD_String("World!");
         
-        _delay_ms(2000); // Пауза 2 сек
-
-        // Очистка
-        LCD_SendByte(0x01, 0);
+        _delay_ms(2000);
+        
+        LCD_SendByte(0x01, 0); // Очистка
         _delay_ms(20);
 
-        // Вывод текста 2
         LCD_Goto(0, 0);
-        LCD_String("Slava");
-        LCD_Goto(1, 0);
-        LCD_String("KPSS!");
-
+        LCD_String("Lab 4"); // Короткое слово для теста
+        
         _delay_ms(2000);
     }
 }
