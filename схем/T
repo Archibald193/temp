@@ -1,0 +1,116 @@
+enum MODE {
+    PLUS = 0,
+    MINUS = 1,
+    MULTIPLY = 2,
+    DIVIDE = 3
+};
+
+// Прототипы функций
+int16_t plus(int8_t a, int8_t b);
+int16_t minus(int8_t a, int8_t b);
+int16_t multiply(int8_t a, int8_t b);
+int16_t divide(int8_t a, int8_t b);
+void LCDsend2digitNumber(int8_t number);
+
+// Массив указателей на функции
+int16_t(*ops[])(int8_t, int8_t) = { plus, minus, multiply, divide };
+
+// Функция для вывода двузначного числа
+void LCDsend2digitNumber(int8_t number) {
+    if (number < 0) {
+        LCDsendChar((uint8_t)'-');
+        number = -number;
+    } else {
+        LCDsendChar((uint8_t)' ');
+    }
+    LCDsendChar((uint8_t)('0' + (number / 10)));
+    LCDsendChar((uint8_t)('0' + (number % 10)));
+}
+
+int main(void) {
+  DDRD &= ~BUTTON_MASK;
+  PORTD |= BUTTON_MASK;
+
+  uint8_t prev_state = 0xFF;
+
+  bool reverse = false;
+  int8_t a = 0, b = 0;
+  int16_t c = 0;
+  enum MODE mode = 0;
+  char mode_chars[] = {'+', '-', '*', '/'};
+
+  LCDinit();
+  LCDGotoXY(0, 0);
+  LCDsend2digitNumber(a);
+  LCDsendChar((uint8_t)mode_chars[mode]);
+  LCDsend2digitNumber(b);
+
+  while (1) {
+    uint8_t curr_state = PIND & BUTTON_MASK;
+
+    for (uint8_t bit = 0; bit < NUM_BUTTONS; bit++) {
+      uint8_t bit_mask = (1 << bit);
+      if (!(curr_state & bit_mask) && (prev_state & bit_mask)) {
+        switch (bit) {
+          case 2: ++mode; mode %= 4; break;
+          case 0: a += reverse ? -10 : 10; break;
+          case 1: a += reverse ? -1  : 1;  break;
+          case 3: b += reverse ? -10 : 10; break;
+          case 4: b += reverse ? -1  : 1;  break;
+          case 6: reverse = !reverse; break;
+          default: break;
+        }
+        if (a > 99) a = 99;
+        if (a < -99) a = -99;
+        if (b > 99) b = 99;
+        if (b < -99) b = -99;
+        
+        LCDGotoXY(0, 1);
+        LCDstring((uint8_t*)"                ", 16); 
+        
+        LCDGotoXY(0, 0);
+        LCDsend2digitNumber(a);
+        LCDsendChar((uint8_t)mode_chars[mode]);
+        LCDsend2digitNumber(b);
+        LCDsendChar((uint8_t)'=');
+        
+        if (b == 0 && mode == DIVIDE) {
+            LCDstring((uint8_t*)"Error", 5);
+        } else {
+          
+          // ******** ВОТ ИСПРАВЛЕНИЕ ОШИБКИ №1 ********
+          c = ops[mode](a, b); 
+          
+          if (c < 0) {
+            c = -c;
+            LCDsendChar((uint8_t)'-');
+          } else {
+            LCDsendChar((uint8_t)' ');
+          }
+          
+          if (mode == DIVIDE) {
+            LCDsendChar((uint8_t)('0' + c / 10));
+            LCDsendChar((uint8_t)'.');
+            LCDsendChar((uint8_t)('0' + c % 10));
+          } else {
+            LCDsendChar((uint8_t)('0' + c / 1000 % 10));
+            LCDsendChar((uint8_t)('0' + c / 100 % 10));
+            LCDsendChar((uint8_t)('0' + c / 10 % 10));
+            LCDsendChar((uint8_t)('0' + c % 10));
+          }
+        }
+        
+        if (reverse) {
+          LCDGotoXY(15, 1);
+          LCDsendChar((uint8_t)'R');
+        }
+        _delay_ms(20);
+      }
+    }
+
+    prev_state = curr_state;
+    _delay_ms(10);
+  }
+
+  return 0;
+}
