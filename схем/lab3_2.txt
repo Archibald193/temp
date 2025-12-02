@@ -1,0 +1,42 @@
+module uart_echo(
+    input clk,
+    input rst_n,
+    input rx,
+    output tx,
+    output [1:0] led
+);
+
+    wire rx_ready;
+    wire [7:0] data_byte;
+    wire tx_busy;
+    wire tick; 
+
+    baud_rate_gen baud_inst (
+        .clk(clk),
+        .rst(~rst_n),
+        .baud_tick(tick)
+    );
+
+    receiver receiver_inst (
+        .clk(clk),
+        .rst(~rst_n),
+        .rx(rx),
+        .rx_tick(tick),
+        .rx_data(data_byte),
+        .rx_ready(rx_ready)
+    );
+
+    transmitter transmitter_inst (
+        .clk(clk),
+        .rst(~rst_n),
+        .tx(tx),
+        .tx_tick(tick),
+        .tx_data(data_byte),
+        .tx_start(rx_ready),
+        .tx_busy(tx_busy)
+    );
+
+    assign led[0] = ~data_byte[0]; 
+    assign led[1] = ~data_byte[1];
+
+endmodule
