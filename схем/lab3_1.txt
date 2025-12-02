@@ -1,34 +1,28 @@
 module main(
-    input clk,       // Вход тактовой частоты 50 МГц (PIN_23)
-    input rst_n,     // Кнопка сброса (PIN_88)
-    input uart_rx,   // Вход данных от компьютера (нужно выбрать пин)
-    output uart_tx,  // Выход данных на компьютер (нужно выбрать пин)
-    output [1:0] led // Светодиоды (PIN_87, PIN_98)
+    input clk,
+    input rst_n,
+    input uart_rx,
+    output uart_tx,
+    output [1:0] led
 );
 
-    // Провода для соединения модулей внутри
-    wire [7:0] data_out; // Данные, полученные от компьютера
-    wire received;       // Сигнал, что данные получены
-    
-    // Инстанцирование (подключение) модуля UART из библиотеки
-    // Важно: проверьте названия портов в файле uart.v из архива, они должны совпадать!
+    wire [7:0] data_out;
+    wire received;
+
     uart uart_inst (
         .clk(clk),
-        .rst(~rst_n),    // Инвертируем, т.к. кнопка при нажатии дает 0
+        .rst(~rst_n),
         .rx(uart_rx),
         .tx(uart_tx),
-        .transmit(received), // Сразу отправляем обратно то, что приняли (Эхо)
-        .tx_byte(data_out),  // Передаем тот же байт, что приняли
-        .received(received), // Сигнал, что байт принят
-        .rx_byte(data_out),  // Принятый байт
+        .transmit(received),
+        .tx_byte(data_out),
+        .received(received),
+        .rx_byte(data_out),
         .is_receiving(),
         .is_transmitting(),
         .recv_error()
     );
 
-    // Логика для светодиодов (чтобы видеть активность)
-    // Поскольку светодиоды управляются "0" (судя по вашей схеме), инвертируем значения
-    // Отобразим младшие 2 бита принятых данных на светодиодах
     assign led[0] = ~data_out[0]; 
     assign led[1] = ~data_out[1];
 
