@@ -1,0 +1,197 @@
+module lab3_1(
+    input wire clk,         // PIN 23
+    input wire rst,         // PIN 88 (Active Low)
+    input wire btn1,        // PIN 144 (Bit 2 - 3-é ïîðÿäîê)
+    input wire btn2,        // PIN 24  (Bit 1 - 2-é ïîðÿäîê)
+    input wire btn3,        // PIN 25  (Bit 0 - 1-é ïîðÿäîê)
+    input wire rx,          // UART RX
+    output wire tx,         // UART TX
+    output reg test_led     // PIN 87 (Visual check)
+);
+
+    // --- Íàñòðîéêà ñèãíàëîâ ---
+    // Êíîïêè ïðè íàæàòèè äàþò 0 (çàìûêàíèå íà çåìëþ), ïîýòîìó èíâåðòèðóåì èõ
+    wire [2:0] current_val;
+    assign current_val = {~btn1, ~btn2, ~btn3};
+
+    // UART ñèãíàëû
+    wire rxclk_en, txclk_en;
+    wire [7:0] rx_data;
+    wire rx_rdy;
+    wire rx_rdy_clr;
+    
+    reg [7:0] tx_data;
+    reg tx_start;
+    wire tx_busy; // Ñèãíàë, ÷òî ïåðåäàò÷èê çàíÿò (îáû÷íî ýòî èíâåðñèÿ rdy ïåðåäàò÷èêà)
+    wire tx_rdy_trans; // Ãîòîâíîñòü ïåðåäàò÷èêà ïðèíÿòü áàéò
+
+    // --- UART Ìîäóëè ---
+    baud_rate_gen uart_baud(
+        .clk_50m(clk), 
+        .rxclk_en(rxclk_en), 
+        .txclk_en(txclk_en)
+    );
+
+    receiver uart_rx(
+        .rx(rx), 
+        .rdy(rx_rdy), 
+        .rdy_clr(rx_rdy_clr), // Ñáðîñ ôëàãà ãîòîâíîñòè
+        .clk_50m(clk), 
+        .clken(rxclk_en), 
+        .data(rx_data)
+    );
+    
+    // Â âàøåì ìîäóëå transmitter wr_en - ýòî ñòàðò ïåðåäà÷è
+    transmitter uart_tx(
+        .din(tx_data), 
+        .wr_en(tx_start), 
+        .clk_50m(clk), 
+        .clken(txclk_en), 
+        .tx(tx)
+        // Åñëè ó âàøåãî ïåðåäàò÷èêà åñòü output wire busy èëè rdy, äîáàâüòå åãî ñþäà.
+        // Îáû÷íî rdy ïåðåäàò÷èêà íóæåí, ÷òîáû çíàòü, êîãäà ìîæíî ñëàòü ñëåäóþùèé áàéò.
+        // Ïðåäïîëîæèì, ÷òî wr_en äîñòàòî÷íî èìïóëüñà, è íàì íóæíî ïðîñòî æäàòü âðåìÿ áàéòà
+        // Íî ëó÷øå èñïîëüçîâàòü ñèãíàë çàíÿòîñòè.
+        // Äëÿ óïðîùåíèÿ, äîáàâèì çàäåðæêó â ìàøèíå ñîñòîÿíèé.
+    );
+    
+    // Ïðèâÿæåì ñáðîñ ôëàãà ïðèåìà ê ÷òåíèþ
+    assign rx_rdy_clr = rx_rdy; 
+
+    // --- Ëîãèêà îòïðàâêè (State Machine) ---
+    
+    // Êîäû ASCII
+    localparam CHAR_I = 8'h49;
+    localparam CHAR_V = 8'h56;
+    localparam CHAR_0 = 8'h30; // Äëÿ íóëÿ
+    localparam CHAR_CR = 8'h0D; // Âîçâðàò êàðåòêè
+    localparam CHAR_LF = 8'h0A; // Ïåðåâîä ñòðîêè
+    localparam CHAR_SPACE = 8'h20; // Ïðîáåë (âõîäíîé òðèããåð)
+
+    reg [3:0] state;
+    reg [2:0] saved_val; // Ñîõðàíåííîå çíà÷åíèå êíîïîê
+    reg [31:0] wait_cnt; // Ñ÷åò÷èê äëÿ çàäåðæêè ìåæäó ñèìâîëàìè (åñëè íåò ôëàãà busy)
+
+    localparam S_IDLE       = 0;
+    localparam S_DECODE     = 1;
+    localparam S_SEND_1     = 2;
+    localparam S_WAIT_1     = 3;
+    localparam S_SEND_2     = 4;
+    localparam S_WAIT_2     = 5;
+    localparam S_SEND_3     = 6;
+    localparam S_WAIT_3     = 7;
+    localparam S_SEND_CR    = 8;
+    localparam S_WAIT_CR    = 9;
+
+    // Çàäåðæêà ïåðåäà÷è (ïðèìåðíî íà ñêîðîñòü 9600 èëè 115200)
+    // 50MHz / 9600 ~ 5208 òàêòîâ íà áèò. Áàéò ~ 50000 òàêòîâ. 
+    // Âîçüìåì ñ çàïàñîì 100000 òàêòîâ, ÷òîáû íå ñïàìèòü.
+    localparam TX_DELAY = 32'd200000; 
+
+    // Áóôåð äëÿ 3 ñèìâîëîâ (ìàêñèìóì äëÿ VII - 3 ñèìâîëà)
+    reg [7:0] char1, char2, char3;
+    reg [1:0] chars_count; // Ñêîëüêî ñèìâîëîâ îòïðàâëÿòü (1, 2 èëè 3)
+
+    always @(posedge clk or negedge rst) begin
+        if (!rst) begin
+            state <= S_IDLE;
+            tx_start <= 0;
+            tx_data <= 0;
+            test_led <= 1; // LED OFF (Active Low)
+            wait_cnt <= 0;
+        end else begin
+            case (state)
+                S_IDLE: begin
+                    tx_start <= 0;
+                    // Æäåì ïðîáåë (êîä 32 èëè 0x20)
+                    if (rx_rdy && rx_data == CHAR_SPACE) begin
+                        saved_val <= current_val; // Çàïîìèíàåì êíîïêè
+                        test_led <= 0; // Âêëþ÷àåì äèîä (ñèãíàë íà÷àëà)
+                        state <= S_DECODE;
+                    end else begin
+                        test_led <= 1;
+                    end
+                end
+
+                S_DECODE: begin
+                    // Ëîãèêà ïåðåâîäà â Ðèìñêèå öèôðû
+                    case (saved_val)
+                        3'd0: begin char1 <= CHAR_0; chars_count <= 1; end // 0
+                        3'd1: begin char1 <= CHAR_I; chars_count <= 1; end // I
+                        3'd2: begin char1 <= CHAR_I; char2 <= CHAR_I; chars_count <= 2; end // II
+                        3'd3: begin char1 <= CHAR_I; char2 <= CHAR_I; char3 <= CHAR_I; chars_count <= 3; end // III
+                        3'd4: begin char1 <= CHAR_I; char2 <= CHAR_V; chars_count <= 2; end // IV
+                        3'd5: begin char1 <= CHAR_V; chars_count <= 1; end // V
+                        3'd6: begin char1 <= CHAR_V; char2 <= CHAR_I; chars_count <= 2; end // VI
+                        3'd7: begin char1 <= CHAR_V; char2 <= CHAR_I; char3 <= CHAR_I; chars_count <= 3; end // VII
+                    endcase
+                    state <= S_SEND_1;
+                end
+
+                // --- Îòïðàâêà 1-ãî ñèìâîëà ---
+                S_SEND_1: begin
+                    tx_data <= char1;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_1;
+                end
+                S_WAIT_1: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) begin
+                        if (chars_count >= 2) state <= S_SEND_2;
+                        else state <= S_SEND_CR;
+                    end
+                end
+
+                // --- Îòïðàâêà 2-ãî ñèìâîëà ---
+                S_SEND_2: begin
+                    tx_data <= char2;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_2;
+                end
+                S_WAIT_2: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) begin
+                        if (chars_count == 3) state <= S_SEND_3;
+                        else state <= S_SEND_CR;
+                    end
+                end
+
+                // --- Îòïðàâêà 3-ãî ñèìâîëà ---
+                S_SEND_3: begin
+                    tx_data <= char3;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_3;
+                end
+                S_WAIT_3: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) begin
+                        state <= S_SEND_CR;
+                    end
+                end
+
+                // --- Îòïðàâêà ïåðåíîñà ñòðîêè (îïöèîíàëüíî, äëÿ êðàñîòû) ---
+                S_SEND_CR: begin
+                    tx_data <= CHAR_CR; // \r
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_CR;
+                end
+                S_WAIT_CR: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) begin
+                        state <= S_IDLE; // Ãîòîâî, æäåì ñëåäóþùèé ïðîáåë
+                    end
+                end
+
+            endcase
+        end
+    end
+
+endmodule
