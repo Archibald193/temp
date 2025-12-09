@@ -1,0 +1,149 @@
+module lab3_final(
+    input wire clk,         // PIN 23
+    input wire rst,         // PIN 88
+    input wire btn1,        // PIN 144
+    input wire btn2,        // PIN 24
+    input wire btn3,        // PIN 25
+    input wire rx,          // PIN RX (Назначьте его!)
+    output wire tx,         // PIN TX (Назначьте его!)
+    output wire test_led    // PIN 87
+);
+
+    // --- Инверсия кнопок ---
+    wire [2:0] current_val;
+    assign current_val = {~btn1, ~btn2, ~btn3};
+
+    // --- UART ---
+    wire rxclk_en, txclk_en;
+    wire [7:0] rx_data;
+    wire rx_rdy;
+    
+    reg [7:0] tx_data;
+    reg tx_start;
+
+    baud_rate_gen uart_baud(.clk_50m(clk), .rxclk_en(rxclk_en), .txclk_en(txclk_en));
+    
+    // Убрали rdy_clr наружу, будем просто читать rdy
+    // Если ваш модуль receiver требует rdy_clr, подключите его к rx_rdy,
+    // но лучше проверить исходник receiver.v.
+    // Обычно для простых лаб: .rdy_clr(rx_rdy) работает.
+    receiver uart_rx(.rx(rx), .rdy(rx_rdy), .rdy_clr(rx_rdy), .clk_50m(clk), .clken(rxclk_en), .data(rx_data));
+    
+    transmitter uart_tx(.din(tx_data), .wr_en(tx_start), .clk_50m(clk), .clken(txclk_en), .tx(tx));
+
+    // --- State Machine ---
+    localparam CHAR_I = 8'h49;
+    localparam CHAR_V = 8'h56;
+    localparam CHAR_0 = 8'h30;
+    localparam CHAR_CR = 8'h0D;
+    localparam CHAR_SPACE = 8'h20;
+    
+    localparam S_IDLE = 0, S_DECODE = 1, S_SEND_1 = 2, S_WAIT_1 = 3, 
+               S_SEND_2 = 4, S_WAIT_2 = 5, S_SEND_3 = 6, S_WAIT_3 = 7, 
+               S_SEND_CR = 8, S_WAIT_CR = 9;
+
+    reg [3:0] state;
+    reg [2:0] saved_val;
+    reg [31:0] wait_cnt;
+    reg [7:0] char1, char2, char3;
+    reg [1:0] chars_count;
+    
+    // Задержка ~2 мс (100000 тактов при 50МГц) чтобы байт успел улететь
+    localparam TX_DELAY = 32'd100000; 
+
+    // --- Визуальный контроль (LED) ---
+    // LED будет гореть тускло (мигать очень быстро), если все ок, 
+    // и моргнет ярко при приеме пробела.
+    reg led_state;
+    assign test_led = led_state;
+
+    always @(posedge clk or negedge rst) begin
+        if (!rst) begin
+            state <= S_IDLE;
+            tx_start <= 0;
+            led_state <= 1; // Выкл (Active Low)
+        end else begin
+            case (state)
+                S_IDLE: begin
+                    tx_start <= 0;
+                    // Если пришел байт И это пробел
+                    if (rx_rdy && rx_data == CHAR_SPACE) begin
+                        saved_val <= current_val;
+                        led_state <= 0; // Включаем LED (сигнал старта)
+                        state <= S_DECODE;
+                    end else begin
+                        led_state <= 1;
+                    end
+                end
+
+                S_DECODE: begin
+                    case (saved_val)
+                        3'd0: begin char1 <= CHAR_0; chars_count <= 1; end
+                        3'd1: begin char1 <= CHAR_I; chars_count <= 1; end
+                        3'd2: begin char1 <= CHAR_I; char2 <= CHAR_I; chars_count <= 2; end
+                        3'd3: begin char1 <= CHAR_I; char2 <= CHAR_I; char3 <= CHAR_I; chars_count <= 3; end
+                        3'd4: begin char1 <= CHAR_I; char2 <= CHAR_V; chars_count <= 2; end
+                        3'd5: begin char1 <= CHAR_V; chars_count <= 1; end
+                        3'd6: begin char1 <= CHAR_V; char2 <= CHAR_I; chars_count <= 2; end
+                        3'd7: begin char1 <= CHAR_V; char2 <= CHAR_I; char3 <= CHAR_I; chars_count <= 3; end
+                    endcase
+                    state <= S_SEND_1;
+                end
+
+                S_SEND_1: begin
+                    tx_data <= char1;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_1;
+                end
+                S_WAIT_1: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) begin
+                        if (chars_count >= 2) state <= S_SEND_2;
+                        else state <= S_SEND_CR;
+                    end
+                end
+
+                S_SEND_2: begin
+                    tx_data <= char2;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_2;
+                end
+                S_WAIT_2: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) begin
+                        if (chars_count == 3) state <= S_SEND_3;
+                        else state <= S_SEND_CR;
+                    end
+                end
+
+                S_SEND_3: begin
+                    tx_data <= char3;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_3;
+                end
+                S_WAIT_3: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) state <= S_SEND_CR;
+                end
+
+                S_SEND_CR: begin
+                    tx_data <= CHAR_CR;
+                    tx_start <= 1;
+                    wait_cnt <= 0;
+                    state <= S_WAIT_CR;
+                end
+                S_WAIT_CR: begin
+                    tx_start <= 0;
+                    wait_cnt <= wait_cnt + 1;
+                    if (wait_cnt > TX_DELAY) state <= S_IDLE;
+                end
+            endcase
+        end
+    end
+endmodule
