@@ -1,4 +1,4 @@
-module lab3_roman(
+module lab3_1(
     input wire clk,
     input wire rst,
     output reg test_led9,
@@ -122,5 +122,6 @@ always @(posedge clk or negedge rst) begin
         endcase
     end
 end
+
 
 endmodule
