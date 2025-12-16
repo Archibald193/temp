@@ -1,0 +1,154 @@
+module lab3_1(
+    input wire clk,       // 50 MHz
+    input wire rst,
+    output reg test_led9, // Светодиод-индикатор приема
+    output wire tx,
+    input wire rx,
+    input wire pin_88,    // Кнопка 1 (4)
+    input wire pin_24,    // Кнопка 2 (2)
+    input wire pin_25     // Кнопка 3 (1)
+);
+
+// --- СТАНДАРТНАЯ ЧАСТЬ (Генерация частот UART) ---
+wire txclk_en, rxclk_en;
+wire rx_rdy;
+wire [7:0] rx_data;
+
+baud_rate_gen uart_baud(
+    .clk_50m(clk),
+    .rxclk_en(rxclk_en),
+    .txclk_en(txclk_en)
+);
+
+// Приемник
+receiver uart_rx(
+    .rx(rx),
+    .rdy(rx_rdy),
+    .rdy_clr(rx_rdy), // Автоматический сброс флага готовности
+    .clk_50m(clk),
+    .clken(rxclk_en),
+    .data(rx_data)
+);
+
+// Передатчик (подключен к нашей логике ниже)
+transmitter uart_tx(
+    .din(tx_byte),
+    .wr_en(tx_start),
+    .clk_50m(clk),
+    .clken(txclk_en),
+    .tx(tx)
+);
+
+// --- ЛОГИКА ---
+
+reg [7:0] tx_byte;      // Символ для отправки
+reg tx_start;           // Команда "Отправить"
+reg [2:0] button_val;   // Сохраненное значение кнопок
+reg [3:0] char_index;   // Какой по счету символ отправляем
+reg [2:0] state;        // Состояние системы
+reg [31:0] delay_timer; // Таймер задержки (32 бита!)
+
+// Состояния
+localparam IDLE      = 0;
+localparam GET_CHAR  = 1;
+localparam SEND_CHAR = 2;
+localparam WAIT_TX   = 3;
+
+// Считываем кнопки (Инверсия ~, если кнопки замыкают на землю/GND)
+// Если кнопки замыкают на +3.3V, уберите значки ~
+wire [2:0] current_buttons = {~pin_88, ~pin_24, ~pin_25};
+
+always @(posedge clk or negedge rst) begin
+    if (!rst) begin
+        state <= IDLE;
+        tx_start <= 0;
+        char_index <= 0;
+        button_val <= 0;
+        tx_byte <= 0;
+        test_led9 <= 0;
+        delay_timer <= 0;
+    end else begin
+        case (state)
+            // 1. Ждем пробел (код 0x20)
+            IDLE: begin
+                tx_start <= 0;
+                char_index <= 0;
+                
+                // Если пришли данные И эти данные == ПРОБЕЛ
+                if (rx_rdy && rx_data == 8'h20) begin
+                    test_led9 <= ~test_led9;   // Мигаем диодом для проверки
+                    button_val <= current_buttons; // Запоминаем кнопки
+                    state <= GET_CHAR;         // Переходим к обработке
+                end
+            end
+
+            // 2. Выбираем, какую букву слать следующей
+            GET_CHAR: begin
+                case (button_val)
+                    3'd0: begin // 0 -> "0"
+                        if (char_index == 0) tx_byte <= "0"; 
+                        else state <= IDLE; 
+                    end
+                    3'd1: begin // 1 -> "I"
+                        if (char_index == 0) tx_byte <= "I"; 
+                        else state <= IDLE; 
+                    end
+                    3'd2: begin // 2 -> "II"
+                        if (char_index < 2) tx_byte <= "I"; 
+                        else state <= IDLE; 
+                    end
+                    3'd3: begin // 3 -> "III"
+                        if (char_index < 3) tx_byte <= "I"; 
+                        else state <= IDLE; 
+                    end
+                    3'd4: begin // 4 -> "IV"
+                        if (char_index == 0) tx_byte <= "I";
+                        else if (char_index == 1) tx_byte <= "V";
+                        else state <= IDLE; 
+                    end
+                    3'd5: begin // 5 -> "V"
+                        if (char_index == 0) tx_byte <= "V"; 
+                        else state <= IDLE; 
+                    end
+                    3'd6: begin // 6 -> "VI"
+                        if (char_index == 0) tx_byte <= "V";
+                        else if (char_index == 1) tx_byte <= "I";
+                        else state <= IDLE; 
+                    end
+                    3'd7: begin // 7 -> "VII"
+                        if (char_index == 0) tx_byte <= "V";
+                        else if (char_index < 3) tx_byte <= "I";
+                        else state <= IDLE; 
+                    end
+                endcase
+                
+                // Если состояние не сбросилось в IDLE, значит шлем символ
+                if (state == GET_CHAR) begin 
+                    state <= SEND_CHAR;
+                end
+            end
+
+            // 3. Даем команду на передачу
+            SEND_CHAR: begin
+                tx_start <= 1; // Импульс записи
+                state <= WAIT_TX;
+                delay_timer <= 0;
+            end
+
+            // 4. Ждем, пока символ уйдет физически (очень важно!)
+            WAIT_TX: begin
+                tx_start <= 0;
+                // Ждем 250 000 тактов (5 мс при 50МГц). 
+                // Этого хватит с запасом для любой скорости UART.
+                if (delay_timer < 32'd250_000) begin
+                    delay_timer <= delay_timer + 1'b1;
+                end else begin
+                    char_index <= char_index + 1'b1; // Индекс следующей буквы
+                    state <= GET_CHAR; // Возвращаемся за следующей буквой
+                end
+            end
+        endcase
+    end
+end
+
+endmodule
