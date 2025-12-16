@@ -1,0 +1,28 @@
+module lab3_1(
+    input wire clk,
+    input wire rst,
+    output reg test_led9,
+    output wire tx,
+    input wire rx
+);
+
+wire txclk_en, rxclk_en;
+wire [7:0] rx_data;
+wire rx_rdy;
+
+baud_rate_gen uart_baud(.clk_50m(clk), .rxclk_en(rxclk_en), .txclk_en(txclk_en));
+transmitter uart_tx(.din(8'h00), .wr_en(1'b0), .clk_50m(clk), .clken(txclk_en), .tx(tx));
+receiver uart_rx(.rx(rx), .rdy(rx_rdy), .rdy_clr(rx_rdy), .clk_50m(clk), .clken(rxclk_en), .data(rx_data));
+
+always @(posedge clk or negedge rst) begin
+    if(!rst) begin
+        test_led9 <= 1'b0;
+    end else begin
+        // Если пришли данные (rx_rdy) И это пробел (0x20)
+        if (rx_rdy && (rx_data == 8'h20)) begin
+            test_led9 <= ~test_led9;
+        end
+    end
+end
+
+endmodule
