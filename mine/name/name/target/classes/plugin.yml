@@ -1,0 +1,8 @@
+name: Name
+version: 1.0
+main: com.example.Name
+api-version: 1.21
+commands:
+  lorenote:
+    description: Выдает записку с текстом
+    usage: /lorenote <текст>
