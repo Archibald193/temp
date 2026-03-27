@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 
 # ==== ВСТАВЬТЕ СЮДА ПУТЬ К ВАШЕМУ ФАЙЛУ ====
-file_path = r"APK.png"  # измените на свой путь
+file_path = r"n_k.png"  # измените на свой путь
 
 # Загрузка изображения
 if not os.path.exists(file_path):  # исправлено: file_path вместо path
@@ -20,7 +20,7 @@ else:
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 # Создание ORB детектора
-orb = cv2.ORB_create(nfeatures=500)
+orb = cv2.ORB_create(nfeatures=5000)
 
 # Поиск ключевых точек и вычисление дескрипторов
 kp, des = orb.detectAndCompute(gray, None)
