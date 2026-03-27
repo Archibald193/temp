@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Clover Pit: Master Pro</title>
+    <style>
+        :root { 
+            --bg: #0d0d0d; --panel: #1a1a15; --text: #e0e0e0; 
+            --neon: #4eff4e; --gold: #ffd700; --red: #ff3333; --blue: #00d4ff;
+        }
+        body { 
+            background: var(--bg); color: var(--text); 
+            font-family: 'Segoe UI', 'Courier New', monospace; 
+            margin: 0; display: flex; flex-direction: column; align-items: center;
+            overflow-x: hidden;
+        }
+        
+        /* Крупные заголовки и статы */
+        .top-bar { 
+            width: 100%; background: #000; padding: 20px; 
+            display: flex; justify-content: space-around; 
+            border-bottom: 3px solid #333; position: sticky; top: 0; z-index: 100;
+            font-size: 24px; font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .main-container { 
+            display: flex; gap: 25px; padding: 25px; width: 100%; 
+            max-width: 1600px; box-sizing: border-box; justify-content: center;
+        }
+
+        .side-panel { 
+            flex: 1; background: var(--panel); border: 2px solid #444; 
+            padding: 15px; border-radius: 10px; height: 600px; overflow-y: auto;
+        }
+        .side-panel h3 { font-size: 20px; color: var(--gold); border-bottom: 2px solid #444; padding-bottom: 10px; margin-top: 0; text-align: center; }
+
+        /* Игровое поле (крупнее) */
+        .center-board { flex: 1.5; display: flex; flex-direction: column; align-items: center; min-width: 550px; }
+        .grid { 
+            display: grid; grid-template-columns: repeat(5, 95px); grid-template-rows: repeat(3, 95px); 
+            gap: 10px; background: #222; padding: 15px; border: 6px solid #444; border-radius: 15px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+        .slot { 
+            width: 95px; height: 95px; background: #000; border: 2px solid #333; 
+            display: flex; justify-content: center; align-items: center; 
+            font-size: 55px; border-radius: 8px; transition: transform 0.1s;
+        }
+        .win-highlight { 
+            border-color: var(--neon); box-shadow: inset 0 0 20px var(--neon), 0 0 15px var(--neon); 
+            background: #0a250a; z-index: 5; transform: scale(1.05);
+        }
+
+        /* Таблицы и списки */
+        table { width: 100%; border-collapse: collapse; font-size: 18px; }
+        th { text-align: left; color: var(--blue); padding-bottom: 10px; }
+        td { padding: 10px 0; border-bottom: 1px solid #333; }
+
+        .group-row { 
+            font-size: 16px; padding: 12px 0; border-bottom: 1px solid #333; 
+            display: flex; justify-content: space-between; font-weight: bold;
+        }
+
+        /* Кнопки (огромные) */
+        .btn { 
+            padding: 15px 30px; font-family: inherit; font-weight: bold; 
+            cursor: pointer; border: 3px solid #555; border-radius: 12px; transition: 0.2s; 
+        }
+        .btn-spin { background: var(--red); color: #fff; font-size: 32px; width: 400px; margin: 20px 0; text-shadow: 2px 2px #000; }
+        .btn-session { background: var(--gold); color: #000; font-size: 24px; width: 400px; }
+        .btn:hover:not(:disabled) { transform: scale(1.02); filter: brightness(1.2); }
+        .btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+        /* Магазин (новые карточки) */
+        .shop-container { width: 95%; max-width: 1400px; background: var(--panel); padding: 25px; border: 3px solid #444; border-radius: 15px; margin-top: 20px; margin-bottom: 50px;}
+        .shop-slots { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-top: 20px; }
+        .shop-card { 
+            background: #111; border: 2px solid #555; padding: 15px; text-align: center; 
+            display: flex; flex-direction: column; justify-content: space-between; height: 180px; border-radius: 10px;
+        }
+        .shop-card h4 { margin: 0; font-size: 16px; color: var(--gold); }
+        .btn-buy { background: #222; color: var(--neon); font-size: 18px; border-color: var(--neon); }
+
+        .win-log { font-size: 28px; color: var(--neon); font-weight: bold; height: 40px; text-shadow: 0 0 10px var(--neon); }
+        .info-txt { font-size: 16px; color: #666; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div>💰 БАЛАНС: <span id="balance" style="color:var(--gold)">200</span> Φ</div>
+    <div id="spins-status" style="color:var(--neon)">СЕССИЯ: ОКОНЧЕНА</div>
+    <div>🚀 МНОЖИТЕЛЬ: X<span id="global-mult">1.0</span></div>
+</div>
+
+<div class="main-container">
+    <!-- Лево -->
+    <div class="side-panel">
+        <h3>СИМВОЛЫ</h3>
+        <table>
+            <thead><tr><th>Вид</th><th>Цена</th><th>Шанс</th></tr></thead>
+            <tbody id="sym-table-body"></tbody>
+        </table>
+    </div>
+
+    <!-- Центр -->
+    <div class="center-board">
+        <div id="win-log" class="win-log"></div>
+        <div class="grid" id="grid"></div>
+        
+        <button id="btn-session" class="btn btn-session" onclick="buySession()">КУПИТЬ 7 СПИНОВ (14 Φ)</button>
+        <button id="btn-spin" class="btn btn-spin" onclick="spin()" disabled>КРУТИТЬ (7)</button>
+        
+        <div class="info-txt">Магазин открывается после завершения сессии</div>
+    </div>
+
+    <!-- Право -->
+    <div class="side-panel">
+        <h3>ГРУППЫ КОМБО</h3>
+        <div id="combo-groups-list"></div>
+    </div>
+</div>
+
+<!-- Магазин -->
+<div class="shop-container">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+        <h2 style="margin:0; color:var(--blue)">🛒 МАГАЗИН ТАЛИСМАНОВ</h2>
+        <button class="btn" style="padding:10px 20px; font-size:18px" onclick="manualRefreshShop()" id="btn-refresh">ОБНОВИТЬ (10 Φ)</button>
+    </div>
+    <div class="shop-slots" id="shop-slots"></div>
+</div>
+
+<script>
+    // --- ЗВУКОВОЙ ДВИЖОК ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playSound(freq, type, duration, vol = 0.1) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    const sfx = {
+        stop: () => playSound(150, 'square', 0.1, 0.05),
+        win: () => {
+            playSound(523.25, 'sine', 0.3); // C5
+            setTimeout(() => playSound(659.25, 'sine', 0.3), 100); // E5
+            setTimeout(() => playSound(783.99, 'sine', 0.4), 200); // G5
+        },
+        buy: () => {
+            playSound(800, 'sine', 0.1);
+            setTimeout(() => playSound(1200, 'sine', 0.2), 50);
+        },
+        error: () => playSound(100, 'sawtooth', 0.3, 0.1),
+        click: () => playSound(400, 'sine', 0.05)
+    };
+
+    // --- ДАННЫЕ ИГРЫ ---
+    let balance = 200;
+    let globalMult = 1.0;
+    let spinsLeft = 0;
+    let sessionCost = 14;
+    let isSpinning = false;
+
+    const symbols = [
+        { id: 0, char: '🍋', weight: 40, price: 2, bonusPrice: 0 },
+        { id: 1, char: '🍒', weight: 40, price: 2, bonusPrice: 0 },
+        { id: 2, char: '🍀', weight: 30, price: 3, bonusPrice: 0 },
+        { id: 3, char: '🔔', weight: 30, price: 3, bonusPrice: 0 },
+        { id: 4, char: '💎', weight: 15, price: 5, bonusPrice: 0 },
+        { id: 5, char: '🎁', weight: 10, price: 7, bonusPrice: 0 },
+        { id: 6, char: '7️⃣', weight: 5,  price: 10, bonusPrice: 0 }
+    ];
+
+    const comboGroups = {
+        "Гор. M": { mult: 1.0, bonus: 0 },
+        "Верт.":  { mult: 1.0, bonus: 0 },
+        "Диаг.":  { mult: 1.5, bonus: 0 },
+        "Гор. L": { mult: 2.0, bonus: 0 },
+        "Гор. XL":{ mult: 3.0, bonus: 0 },
+        "Вверх/Вниз": { mult: 4.0, bonus: 0 },
+        "Небо/Земля": { mult: 7.0, bonus: 0 },
+        "Глаз":   { mult: 8.0, bonus: 0 },
+        "Джекпот":{ mult: 50.0, bonus: 0 }
+    };
+
+    const patterns = [
+        { group: "Гор. M", c:[[0,0],[0,1],[0,2]] }, { group: "Гор. M", c:[[0,1],[0,2],[0,3]] }, { group: "Гор. M", c:[[0,2],[0,3],[0,4]] },
+        { group: "Гор. M", c:[[1,0],[1,1],[1,2]] }, { group: "Гор. M", c:[[1,1],[1,2],[1,3]] }, { group: "Гор. M", c:[[1,2],[1,3],[1,4]] },
+        { group: "Гор. M", c:[[2,0],[2,1],[2,2]] }, { group: "Гор. M", c:[[2,1],[2,2],[2,3]] }, { group: "Гор. M", c:[[2,2],[2,3],[2,4]] },
+        { group: "Верт.",  c:[[0,0],[1,0],[2,0]] }, { group: "Верт.",  c:[[0,1],[1,1],[2,1]] }, { group: "Верт.",  c:[[0,2],[1,2],[2,2]] }, { group: "Верт.",  c:[[0,3],[1,3],[2,3]] }, { group: "Верт.",  c:[[0,4],[1,4],[2,4]] },
+        { group: "Диаг.",  c:[[0,0],[1,1],[2,2]] }, { group: "Диаг.",  c:[[0,1],[1,2],[2,3]] }, { group: "Диаг.",  c:[[0,2],[1,3],[2,4]] },
+        { group: "Диаг.",  c:[[0,2],[1,1],[2,0]] }, { group: "Диаг.",  c:[[0,3],[1,2],[2,1]] }, { group: "Диаг.",  c:[[0,4],[1,3],[2,2]] },
+        { group: "Гор. L", c:[[0,0],[0,1],[0,2],[0,3]] }, { group: "Гор. L", c:[[0,1],[0,2],[0,3],[0,4]] },
+        { group: "Гор. L", c:[[1,0],[1,1],[1,2],[1,3]] }, { group: "Гор. L", c:[[1,1],[1,2],[1,3],[1,4]] },
+        { group: "Гор. L", c:[[2,0],[2,1],[2,2],[2,3]] }, { group: "Гор. L", c:[[2,1],[2,2],[2,3],[2,4]] },
+        { group: "Гор. XL",c:[[0,0],[0,1],[0,2],[0,3],[0,4]] }, { group: "Гор. XL",c:[[1,0],[1,1],[1,2],[1,3],[1,4]] }, { group: "Гор. XL",c:[[2,0],[2,1],[2,2],[2,3],[2,4]] },
+        { group: "Вверх/Вниз", c:[[2,0],[1,1],[0,2],[1,3],[2,4]] }, { group: "Вверх/Вниз", c:[[0,0],[1,1],[2,2],[1,3],[0,4]] },
+        { group: "Небо/Земля", c:[[0,0],[0,1],[0,2],[0,3],[0,4]] }, { group: "Небо/Земля", c:[[2,0],[2,1],[2,2],[2,3],[2,4]] },
+        { group: "Глаз",   c:[[0,1],[0,2],[0,3],[1,1],[1,3],[2,1],[2,2],[2,3]] },
+        { group: "Джекпот",c:Array.from({length:15},(_,i)=>[Math.floor(i/5),i%5]) }
+    ];
+
+    let currentShopItems = [];
+
+    // --- ЛОГИКА ---
+    const gridEl = document.getElementById('grid');
+    for(let i=0; i<15; i++) {
+        const d = document.createElement('div'); d.className = 'slot'; d.id = `s-${i}`; d.innerText = '●';
+        gridEl.appendChild(d);
+    }
+
+    function updateUI() {
+        document.getElementById('balance').innerText = Math.floor(balance);
+        document.getElementById('global-mult').innerText = globalMult.toFixed(1);
+        
+        const status = document.getElementById('spins-status');
+        if(spinsLeft > 0) {
+            status.innerText = `🔥 СЕССИЯ: ${spinsLeft} СПИНОВ`;
+            status.style.color = "var(--neon)";
+            document.getElementById('btn-spin').disabled = isSpinning;
+            document.getElementById('btn-spin').innerText = `КРУТИТЬ (${spinsLeft})`;
+            document.getElementById('btn-session').disabled = true;
+        } else {
+            status.innerText = `💤 СЕССИЯ ОКОНЧЕНА`;
+            status.style.color = "var(--red)";
+            document.getElementById('btn-spin').disabled = true;
+            document.getElementById('btn-session').disabled = balance < sessionCost;
+        }
+
+        // Таблица
+        const totalW = symbols.reduce((a,b) => a + b.weight, 0);
+        document.getElementById('sym-table-body').innerHTML = symbols.map(s => `
+            <tr><td>${s.char}</td><td>${s.price + s.bonusPrice}</td><td>${((s.weight/totalW)*100).toFixed(1)}%</td></tr>
+        `).join('');
+
+        // Комбо
+        document.getElementById('combo-groups-list').innerHTML = Object.entries(comboGroups).map(([name, data]) => `
+            <div class="group-row"><span>${name}</span><span style="color:var(--neon)">X${(data.mult + data.bonus).toFixed(1)}</span></div>
+        `).join('');
+
+        renderShop();
+    }
+
+    function generateShopItems() {
+        const pool = [];
+        symbols.forEach(s => pool.push({ type:'price', id:s.id, cost: 50, title: `Цена ${s.char} +1` }));
+        symbols.forEach(s => {
+            pool.push({ type:'weight_up', id:s.id, cost: 40, title: `Шанс ${s.char} +5` });
+            pool.push({ type:'weight_down', id:s.id, cost: 30, title: `Шанс ${s.char} -5` });
+        });
+        Object.keys(comboGroups).forEach(name => pool.push({ type:'combo', group:name, cost: 60, title: `Множ. ${name} +0.5` }));
+        pool.push({ type:'global', cost: 120, title: `Общий множ. +0.1` });
+
+        currentShopItems = [];
+        for(let i=0; i<5; i++) {
+            currentShopItems.push({...pool[Math.floor(Math.random()*pool.length)], uid: Math.random()});
+        }
+    }
+
+    function renderShop() {
+        const container = document.getElementById('shop-slots');
+        container.innerHTML = currentShopItems.map((item, idx) => `
+            <div class="shop-card">
+                <h4>${item.title}</h4>
+                <button class="btn btn-buy" onclick="buyItem(${idx})" 
+                    ${(balance < item.cost || spinsLeft > 0 || item.sold) ? 'disabled' : ''}>
+                    ${item.sold ? 'КУПЛЕНО' : item.cost + ' Φ'}
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function buyItem(idx) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const item = currentShopItems[idx];
+        if(balance >= item.cost) {
+            balance -= item.cost;
+            sfx.buy();
+            if(item.type === 'price') symbols[item.id].bonusPrice += 1;
+            if(item.type === 'weight_up') symbols[item.id].weight += 5;
+            if(item.type === 'weight_down') symbols[item.id].weight = Math.max(1, symbols[item.id].weight - 5);
+            if(item.type === 'combo') comboGroups[item.group].bonus += 0.5;
+            if(item.type === 'global') globalMult += 0.1;
+            item.sold = true;
+            updateUI();
+        } else {
+            sfx.error();
+        }
+    }
+
+    function buySession() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if(balance >= sessionCost) {
+            balance -= sessionCost;
+            spinsLeft = 7;
+            sfx.click();
+            updateUI();
+        } else { sfx.error(); }
+    }
+
+    function manualRefreshShop() {
+        if(balance >= 10 && spinsLeft === 0) {
+            balance -= 10;
+            sfx.click();
+            generateShopItems();
+            updateUI();
+        } else { sfx.error(); }
+    }
+
+    async function spin() {
+        if(spinsLeft <= 0 || isSpinning) return;
+        isSpinning = true;
+        spinsLeft--;
+        document.getElementById('win-log').innerText = "";
+        document.querySelectorAll('.slot').forEach(s => { s.classList.remove('win-highlight'); s.style.transform = 'translateY(10px)'; });
+        updateUI();
+
+        let matrix = [[],[],[]];
+        for(let c=0; c<5; c++) {
+            for(let r=0; r<3; r++) {
+                let s = getRandomSym();
+                matrix[r][c] = s;
+                const slot = document.getElementById(`s-${r*5+c}`);
+                slot.innerText = s.char;
+                slot.style.transform = 'translateY(0)';
+            }
+            sfx.stop();
+            await new Promise(res => setTimeout(res, 150));
+        }
+
+        checkWins(matrix);
+        isSpinning = false;
+        if(spinsLeft === 0) generateShopItems();
+        updateUI();
+    }
+
+    function getRandomSym() {
+        let total = symbols.reduce((a,b) => a + b.weight, 0);
+        let r = Math.random() * total;
+        for(let s of symbols) { if(r < s.weight) return s; r -= s.weight; }
+    }
+
+    function checkWins(matrix) {
+        let totalWin = 0;
+        patterns.forEach(p => {
+            let firstChar = matrix[p.c[0][0]][p.c[0][1]].char;
+            if(p.c.every(pos => matrix[pos[0]][pos[1]].char === firstChar)) {
+                let sym = symbols.find(s => s.char === firstChar);
+                let group = comboGroups[p.group];
+                let payout = (sym.price + sym.bonusPrice) * (group.mult + group.bonus) * globalMult;
+                totalWin += payout;
+                p.c.forEach(pos => document.getElementById(`s-${pos[0]*5+pos[1]}`).classList.add('win-highlight'));
+            }
+        });
+        if(totalWin > 0) {
+            balance += totalWin;
+            sfx.win();
+            document.getElementById('win-log').innerText = `🏆 ВЫИГРЫШ: +${totalWin.toFixed(1)} Φ`;
+        }
+    }
+
+    generateShopItems();
+    updateUI();
+</script>
+</body>
+</html>
