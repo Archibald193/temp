@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>TERMINAL CASINO</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root { 
+            --bg: #030303; --term-bg: #0a0c0a; 
+            --amber: #ffb000; --green: #39ff14; --red: #ff003c; --blue: #00d4ff; --purple: #b026ff;
+            --dim: #2a332a; --text: #d0f0d0; --energy: #ffdd00;
+            font-family: 'VT323', 'Courier New', monospace;
+        }
+
+        body { background: var(--bg); color: var(--amber); margin: 0; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; font-size: 22px; user-select: none; }
+        
+        body::after { content: " "; display: block; position: fixed; inset: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); z-index: 999; background-size: 100% 4px, 6px 100%; pointer-events: none; opacity: 0.6; }
+        body::before { content: " "; display: block; position: fixed; inset: 0; box-shadow: inset 0 0 100px rgba(0,0,0,0.95); z-index: 998; pointer-events: none; }
+
+        .header { width: 100%; background: #000; border-bottom: 2px solid var(--green); padding: 15px; display: flex; justify-content: space-around; z-index: 10000; position: sticky; top:0; box-shadow: 0 5px 30px rgba(57, 255, 20, 0.1); text-transform: uppercase;}
+        .main { display: flex; gap: 20px; padding: 20px; max-width: 1700px; width: 100%; box-sizing: border-box; justify-content: center; z-index: 3;}
+        
+        .panel { background: var(--term-bg); border: 1px solid var(--dim); padding: 20px; box-shadow: inset 0 0 30px rgba(0,255,0,0.02); position: relative;}
+        .panel::before { content:''; position:absolute; top:0; left:0; width:10px; height:10px; border-top: 2px solid var(--green); border-left: 2px solid var(--green); }
+        .panel::after { content:''; position:absolute; bottom:0; right:0; width:10px; height:10px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+        
+        .panel-side { flex: 1; height: 640px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--green) #000; }
+        .panel-center { flex: 1.5; display: flex; flex-direction: column; align-items: center; border-color: var(--amber); }
+        .panel-center::before { border-color: var(--amber); } .panel-center::after { border-color: var(--amber); }
+
+        h2, h3 { margin: 0 0 15px 0; color: var(--green); border-bottom: 1px dashed var(--dim); padding-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
+
+        .grid { display: grid; grid-template-columns: repeat(5, 95px); grid-template-rows: repeat(3, 95px); gap: 10px; background: #020202; padding: 20px; border: 2px solid var(--dim); margin-bottom: 15px; border-radius: 5px; transition: 0.2s;}
+        .slot { width: 95px; height: 95px; background: #080808; border: 1px solid #1a1a1a; display: flex; justify-content: center; align-items: center; font-size: 55px; position: relative; transition: 0.1s; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;}
+        .slot.win { border-color: var(--green); box-shadow: 0 0 20px rgba(57,255,20,0.5) inset; background: #051505; transform: scale(1.05); z-index: 5;}
+        .slot.golden { border-color: var(--amber); box-shadow: 0 0 15px rgba(255,176,0,0.2) inset; }
+        .slot.golden::after { content: '🌟'; position: absolute; top: 2px; right: 2px; font-size: 18px; animation: pulse 1s infinite; text-shadow: 0 0 10px var(--amber);}
+        .slot.d4-reroll { animation: d4Spin 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); border-color: var(--blue); }
+
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.3); opacity: 1; } }
+        @keyframes d4Spin { 0% { transform: scale(0.1) rotate(0deg); opacity: 0;} 100% { transform: scale(1) rotate(360deg); opacity: 1;} }
+
+        /* Эффекты Джекпота */
+        .jackpot-effect { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle, rgba(255,215,0,0.5) 0%, transparent 80%); z-index: 9999; display: none; animation: flashJackpot 0.15s infinite alternate; mix-blend-mode: screen;}
+        @keyframes flashJackpot { from { opacity: 0.4; } to { opacity: 1; } }
+        
+        .glow-jackpot { animation: gridGlow 0.2s infinite alternate !important; border-color: #fff !important; }
+        @keyframes gridGlow { 0% { box-shadow: 0 0 50px var(--amber), inset 0 0 50px var(--amber); } 100% { box-shadow: 0 0 150px #fff, inset 0 0 150px #fff; } }
+
+        table { width: 100%; border-collapse: collapse; font-size: 20px; }
+        th { text-align: left; color: var(--dim); padding-bottom: 8px; border-bottom: 1px solid var(--dim);}
+        td { padding: 10px 0; border-bottom: 1px dashed var(--dim); }
+        .emoji-cell { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif; font-size: 26px; }
+
+        .combo-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed var(--dim); }
+        .mini-grid { display: grid; grid-template-columns: repeat(5, 12px); gap: 2px; background: #000; padding: 4px; border: 1px solid var(--dim); border-radius: 2px;}
+        .mini-cell { width: 12px; height: 12px; background: #111; border-radius: 1px; }
+        .mini-cell.active { background: var(--amber); box-shadow: 0 0 4px var(--amber); }
+
+        .btn { font-family: 'VT323', monospace; font-size: 24px; padding: 10px 20px; cursor: pointer; background: #000; color: var(--amber); border: 1px solid var(--amber); text-transform: uppercase; transition: 0.2s; position: relative; overflow: hidden; }
+        .btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); transition: 0.5s; }
+        .btn:hover:not(:disabled)::before { left: 100%; }
+        .btn:hover:not(:disabled) { background: rgba(255, 176, 0, 0.1); color: var(--amber); box-shadow: 0 0 10px rgba(255, 176, 0, 0.3); }
+        .btn:disabled { border-color: var(--dim); color: var(--dim); cursor: not-allowed; background: #000; box-shadow: none; }
+        
+        .controls-row { display: flex; gap: 10px; width: 100%; margin-top: 5px; }
+        .btn-spin { font-size: 36px; padding: 20px 40px; background: #1a0000; color: var(--red); border-color: var(--red); width: 100%; margin-top: 10px; letter-spacing: 2px;}
+        .btn-spin:hover:not(:disabled) { background: var(--red); color: #000; box-shadow: 0 0 20px var(--red); }
+        .btn-cam { width: 100%; margin-top: 5px; border-color: var(--energy); color: var(--energy); }
+        
+        .bottom-area { width: 100%; max-width: 1700px; padding: 0 20px; box-sizing: border-box; z-index: 3;}
+        .talisman-table { background: #050505; border: 1px solid var(--dim); padding: 15px; min-height: 80px; display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; align-items: center; box-shadow: inset 0 0 20px #000;}
+        .talisman-item { width: 65px; height: 65px; background: #111; border: 1px solid var(--dim); display: flex; justify-content: center; align-items: center; font-size: 38px; position: relative; cursor: help; transition: 0.2s; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;}
+        .talisman-item:hover { border-color: var(--amber); transform: translateY(-2px); }
+        .badge { position: absolute; bottom: -5px; right: -5px; background: var(--amber); color: #000; font-size: 14px; padding: 2px 6px; font-weight: bold; border-radius: 2px;}
+        .badge.energy { top: -5px; bottom: auto; background: var(--energy); }
+        
+        .pepper-proc { animation: pepperBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); border-color: var(--green); box-shadow: 0 0 15px var(--green); z-index: 10;}
+        @keyframes pepperBounce { 0%, 100% { transform: scale(1) translateY(0); } 30% { transform: scale(1.4) translateY(-15px); } }
+
+        .shop-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .shop-card { background: #050505; border: 1px solid var(--dim); padding: 15px; display: flex; flex-direction: column; justify-content: space-between; height: 210px; position: relative; overflow: hidden; }
+        .shop-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: var(--dim); }
+        .shop-card h4 { margin: 0; font-size: 20px; text-shadow: 0 0 5px rgba(255,255,255,0.2); font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'VT323', monospace;}
+        .shop-card p { font-size: 16px; color: #888; margin: 10px 0; line-height: 1.1; }
+
+        .rarity-common { color: #a0a0a0; } .rarity-uncommon { color: var(--green); } .rarity-rare { color: var(--blue); } .rarity-legendary { color: var(--purple); } .rarity-instant { color: var(--amber); }
+
+        #tooltip { position: fixed; background: rgba(5,5,5,0.95); border: 1px solid var(--amber); color: var(--text); padding: 15px; font-size: 20px; z-index: 1000; display: none; max-width: 320px; box-shadow: 5px 5px 0 rgba(255, 176, 0, 0.2); backdrop-filter: blur(5px); }
+        .btn-sell { width: 100%; margin-top: 15px; font-size: 18px; background: #1a0000; color: var(--red); border: 1px solid var(--red); cursor:pointer;}
+        .btn-sell:hover { background: var(--red); color: #000; }
+
+        .camera-flash { position: fixed; inset: 0; background: #fff; z-index: 9999; pointer-events: none; opacity: 0; }
+        .flash-anim { animation: flashEffect 0.5s ease-out; }
+        @keyframes flashEffect { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* Награды (Апгрейды) */
+        #screen-upgrades { background: rgba(0,0,0,0.98); }
+        .upgrade-grid { display: flex; gap: 20px; margin-top: 40px; }
+        .upg-card { background: #050505; border: 2px solid var(--green); padding: 30px; width: 300px; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; justify-content: center; min-height: 200px;}
+        .upg-card:hover { background: #0a1a0a; transform: scale(1.05); box-shadow: 0 0 20px var(--green); }
+        .upg-red { border-color: var(--red); color: var(--red); }
+        .upg-red:hover { background: #1a0505; box-shadow: 0 0 20px var(--red); }
+
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; backdrop-filter: blur(10px);}
+        .overlay h1 { font-size: 100px; margin: 0; text-shadow: 0 0 30px; }
+        #screen-tax h1 { color: var(--amber); } #screen-collector h1 { color: var(--red); animation: shake 0.1s infinite; } #screen-jail h1 { color: var(--dim); letter-spacing: 15px;}
+        .anim-text { font-size: 60px; font-weight: bold; margin: 30px 0; }
+        @keyframes shake { 0%, 100% { transform: translate(5px, 5px); } 50% { transform: translate(-5px, -5px); } }
+    </style>
+</head>
+<body>
+
+<div id="flash-overlay" class="camera-flash"></div>
+<!-- Явно добавил блок джекпота в HTML -->
+<div id="jackpot-fx" class="jackpot-effect"></div>
+<div id="tooltip"></div>
+
+<!-- Модалки -->
+<div id="screen-tax" class="overlay">
+    <h1>НАЛОГОВАЯ ПРОВЕРКА</h1>
+    <div id="tax-details" class="anim-text" style="color:var(--amber)"></div>
+    <button class="btn" style="font-size:36px; padding: 20px 60px; border-color:var(--amber)" onclick="payTax()">ОПЛАТИТЬ</button>
+</div>
+<div id="screen-upgrades" class="overlay">
+    <h1 style="color:var(--green)">ВЫБОР НАГРАДЫ</h1>
+    <p style="font-size:24px">Выберите 1 улучшение для терминала.</p>
+    <div class="upgrade-grid" id="upgrade-container"></div>
+</div>
+<div id="screen-collector" class="overlay">
+    <h1>КОЛЛЕКТОРЫ</h1>
+    <div id="col-money" class="anim-text" style="color:var(--red)">Баланс: -</div>
+    <div id="col-luck" class="anim-text" style="color:var(--green)">Удача: -</div>
+    <button id="col-btn" class="btn" style="display:none; margin-top:30px; font-size:30px;" onclick="closeCollectors()">ПРОДОЛЖИТЬ</button>
+</div>
+<div id="screen-jail" class="overlay">
+    <h1>ТЮРЬМА</h1>
+    <button class="btn" style="font-size:30px; margin-top:20px;" onclick="location.reload()">НАЧАТЬ ЗАНОВО</button>
+</div>
+
+<!-- Верхняя панель -->
+<div class="header">
+    <div>
+        <button class="btn" style="font-size:16px; padding:5px; border-color:var(--dim); color:var(--text)" onclick="exportJSON()">[ ЭКСПОРТ ]</button>
+        <button class="btn" style="font-size:16px; padding:5px; border-color:var(--dim); color:var(--text)" onclick="document.getElementById('import-file').click()">[ ИМПОРТ ]</button>
+        <input type="file" id="import-file" style="display:none" accept=".json" onchange="importJSON(event)">
+    </div>
+    <div>БАЛАНС: <span id="ui-bal" style="color:var(--amber)">13</span> Φ</div>
+    <div>БИЛЕТЫ: <span id="ui-tick" style="color:var(--green)">2</span> 🎫</div>
+    <div>УДАЧА: <span id="ui-luck" style="color:var(--blue)">0</span></div>
+    <div>РАУНД: <span id="ui-round">1</span> (<span id="ui-ses-played">0</span>/5)</div>
+    <div>НАЛОГ: <span id="ui-tax" style="color:var(--red)">75</span> Φ</div>
+</div>
+
+<div class="main">
+    <div class="panel panel-side">
+        <h3>БАЗА СИМВОЛОВ</h3>
+        <table>
+            <thead><tr><th>СИМ</th><th>ЦЕНА (БАЗА)</th><th>ШАНС</th></tr></thead>
+            <tbody id="ui-symbols"></tbody>
+        </table>
+    </div>
+
+    <div class="panel panel-center">
+        <div id="log" style="font-size:34px; height:40px; color:var(--green); text-align:center; margin-bottom:15px; text-shadow: 0 0 10px var(--green);">ЖДУ ВВОДА...</div>
+        <div class="grid" id="grid"></div>
+        
+        <div class="controls-row">
+            <button id="btn-auto" class="btn" style="flex:1" onclick="toggleAuto()">АВТО: ВЫКЛ</button>
+            <button id="btn-ses7" class="btn" style="flex:1.5; color:var(--amber); border-color:var(--amber)" onclick="buySession(7)">7 СПИН (<span id="ui-c7">7</span>Φ) [+1🎫]</button>
+            <button id="btn-ses3" class="btn" style="flex:1.5; color:var(--amber); border-color:var(--amber)" onclick="buySession(3)">3 СПИН (<span id="ui-c3">3</span>Φ) [+2🎫]</button>
+        </div>
+        <button id="btn-action" class="btn btn-cam" onclick="useActionBtn()" disabled>⚡ АКТИВАЦИЯ ТАЛИСМАНОВ</button>
+        <button id="btn-spin" class="btn btn-spin" onclick="spin()" disabled>КРУТИТЬ (0)</button>
+    </div>
+
+    <div class="panel panel-side">
+        <h3>ПАТТЕРНЫ (X<span id="ui-gmult">1.0</span>)</h3>
+        <div id="ui-combos"></div>
+    </div>
+</div>
+
+<div class="bottom-area">
+    <div class="panel" style="margin-bottom: 20px; border-color: var(--red);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="color:var(--red); margin:0;">КРЕДИТНЫЙ ОТДЕЛ</h3>
+            <div style="font-size:28px;">ДОЛГ: <span id="ui-debt" style="color:var(--red)">0</span> Φ | ТАЙМЕР: <span id="ui-timer">0</span> СЕК</div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn" style="border-color:var(--red); color:var(--red);" id="btn-loan" onclick="takeLoan()">ВЗЯТЬ (500)</button>
+                <button class="btn" style="border-color:var(--red); color:var(--red);" id="btn-pay10" onclick="payLoan(0.1)">-10%</button>
+                <button class="btn" style="border-color:var(--red); color:var(--red);" id="btn-payall" onclick="payLoan(1)">ВСЁ</button>
+            </div>
+        </div>
+    </div>
+
+    <h3 style="color:var(--text); margin-bottom:5px;">СТОЛ ТАЛИСМАНОВ (<span id="ui-slots">0</span>/<span id="ui-max-slots">7</span>)</h3>
+    <div class="talisman-table" id="ui-inventory"></div>
+
+    <div class="panel">
+        <div style="display:flex; justify-content:space-between;">
+            <h3>ЧЕРНЫЙ РЫНОК (БИЛЕТЫ 🎫)</h3>
+            <button class="btn" style="padding:5px 15px; font-size:18px; border-color:var(--dim); color:var(--text)" onclick="refreshShop()" id="btn-refresh">ОБНОВИТЬ (<span id="ui-refcost">3</span> Φ)</button>
+        </div>
+        <div class="shop-grid" id="ui-shop"></div>
+    </div>
+</div>
+
+<script>
+    // Улучшенный обработчик ошибок
+    window.addEventListener('error', function(e) {
+        let log = document.getElementById('log');
+        if(log) log.innerHTML = `<span style="color:var(--red); font-size:18px;">SYS_ERR: ${e.message}</span>`;
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+        let log = document.getElementById('log');
+        if(log) log.innerHTML = `<span style="color:var(--red); font-size:18px;">ASYNC_ERR: ${e.reason.message || e.reason}</span>`;
+    });
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let actx = new AudioContext();
+    function sfx(f, type, dur, vol=0.1) {
+        if(actx.state === 'suspended') actx.resume();
+        let o = actx.createOscillator(), g = actx.createGain();
+        o.type = type; o.frequency.setValueAtTime(f, actx.currentTime);
+        g.gain.setValueAtTime(vol, actx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime+dur);
+        o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime+dur);
+    }
+    const snd = {
+        stop: () => sfx(100, 'sawtooth', 0.1, 0.05),
+        winCombo: () => { sfx(600, 'square', 0.1, 0.1); setTimeout(()=>sfx(800, 'square', 0.15, 0.1), 100); },
+        buy: () => sfx(900, 'sine', 0.1),
+        err: () => sfx(50, 'sawtooth', 0.5, 0.2),
+        alert: () => sfx(800, 'sawtooth', 0.1, 0.3),
+        cam: () => { sfx(1200, 'square', 0.05, 0.1); setTimeout(()=>sfx(300, 'sawtooth', 0.1, 0.2), 50); },
+        pepper: () => { sfx(1500, 'triangle', 0.1, 0.2); setTimeout(()=>sfx(2000, 'triangle', 0.1, 0.2), 100); },
+        d4: () => { sfx(400, 'sawtooth', 0.3, 0.2); setTimeout(()=>sfx(300, 'sawtooth', 0.3, 0.2), 200); },
+        jackpot: () => { sfx(800, 'square', 0.5, 0.2); setTimeout(()=>sfx(1000, 'square', 0.5, 0.2), 200); setTimeout(()=>sfx(1200, 'square', 1, 0.2), 400); }
+    };
+
+    // --- СТЕЙТ ---
+    let state = {
+        bal: 13, tickets: 2, luck: 0, gMult: 1.0, 
+        spins: 0, cost7: 7, cost3: 3, refCost: 3,
+        round: 1, sesPlayed: 0, tax: 75,
+        debt: 0, timer: 0, inv: [], emptySpins: 0, toyTrainCount: 0,
+        maxSlots: 7, purchasedInstants: [], gemLuck: 0
+    };
+    
+    let isSpinning = false; let auto = false; let loanInt = null; let isDead = false;
+
+    let syms = [
+        { id: 0, char: '🍋', w: 40, price: 2, base: 2 }, { id: 1, char: '🍒', w: 40, price: 2, base: 2 },
+        { id: 2, char: '🍀', w: 30, price: 3, base: 3 }, { id: 3, char: '🔔', w: 30, price: 3, base: 3 },
+        { id: 4, char: '💎', w: 15, price: 5, base: 5 }, { id: 5, char: '🎁', w: 10, price: 7, base: 7 },
+        { id: 6, char: '7️⃣', w: 5,  price: 10, base: 10 }
+    ];
+
+    let combos = {
+        "Гор. M": { m: 1.0, b: 0 }, "Верт.": { m: 1.0, b: 0 }, "Диаг.": { m: 1.5, b: 0 },
+        "Гор. L": { m: 2.0, b: 0 }, "Гор. XL": { m: 3.0, b: 0 }, "Вверх/Вниз": { m: 4.0, b: 0 },
+        "Небо/Земля": { m: 7.0, b: 0 }, "Глаз": { m: 8.0, b: 0 }, "Джекпот": { m: 50.0, b: 0 }
+    };
+
+    const pats = [
+        { g: "Гор. M", c:[[0,0],[0,1],[0,2]] }, { g: "Гор. M", c:[[0,1],[0,2],[0,3]] }, { g: "Гор. M", c:[[0,2],[0,3],[0,4]] }, { g: "Гор. M", c:[[1,0],[1,1],[1,2]] }, { g: "Гор. M", c:[[1,1],[1,2],[1,3]] }, { g: "Гор. M", c:[[1,2],[1,3],[1,4]] }, { g: "Гор. M", c:[[2,0],[2,1],[2,2]] }, { g: "Гор. M", c:[[2,1],[2,2],[2,3]] }, { g: "Гор. M", c:[[2,2],[2,3],[2,4]] },
+        { g: "Верт.", c:[[0,0],[1,0],[2,0]] }, { g: "Верт.", c:[[0,1],[1,1],[2,1]] }, { g: "Верт.", c:[[0,2],[1,2],[2,2]] }, { g: "Верт.", c:[[0,3],[1,3],[2,3]] }, { g: "Верт.", c:[[0,4],[1,4],[2,4]] },
+        { g: "Диаг.", c:[[0,0],[1,1],[2,2]] }, { g: "Диаг.", c:[[0,1],[1,2],[2,3]] }, { g: "Диаг.", c:[[0,2],[1,3],[2,4]] }, { g: "Диаг.", c:[[0,2],[1,1],[2,0]] }, { g: "Диаг.", c:[[0,3],[1,2],[2,1]] }, { g: "Диаг.", c:[[0,4],[1,3],[2,2]] },
+        { g: "Гор. L", c:[[0,0],[0,1],[0,2],[0,3]] }, { g: "Гор. L", c:[[0,1],[0,2],[0,3],[0,4]] }, { g: "Гор. L", c:[[1,0],[1,1],[1,2],[1,3]] }, { g: "Гор. L", c:[[1,1],[1,2],[1,3],[1,4]] }, { g: "Гор. L", c:[[2,0],[2,1],[2,2],[2,3]] }, { g: "Гор. L", c:[[2,1],[2,2],[2,3],[2,4]] },
+        { g: "Гор. XL",c:[[0,0],[0,1],[0,2],[0,3],[0,4]] }, { g: "Гор. XL",c:[[1,0],[1,1],[1,2],[1,3],[1,4]] }, { g: "Гор. XL",c:[[2,0],[2,1],[2,2],[2,3],[2,4]] },
+        { g: "Вверх/Вниз", c:[[2,0],[1,1],[0,2],[1,3],[2,4]] }, { g: "Вверх/Вниз", c:[[0,0],[1,1],[2,2],[1,3],[0,4]] },
+        { g: "Небо/Земля", c:[[0,0],[0,1],[0,2],[0,3],[0,4],[1,1],[1,3],[2,2]] }, { g: "Небо/Земля", c:[[2,0],[2,1],[2,2],[2,3],[2,4],[1,1],[1,3],[0,2]] },
+        { g: "Глаз", c:[[0,1],[0,2],[0,3],[1,0],[1,1],[1,3],[1,4],[2,1],[2,2],[2,3]] }, { g: "Джекпот",c:Array.from({length:15},(_,i)=>[Math.floor(i/5),i%5]) }
+    ];
+
+    const tDB_base = [
+        { id:'p_red', type:'passive', chance:0.20, icon:'🌶️', name:'Красный перчик', cost:1, rarity:'common', usesMax:12, luck:5, desc:'Удача +5 (Активируется случайно: 20%). Удаляется после 12 активаций.' },
+        { id:'p_green', type:'passive', chance:0.15, icon:'🌶️', name:'Зеленый перчик', cost:2, rarity:'common', usesMax:9, luck:7, desc:'Удача +7 (Активируется случайно: 15%). Удаляется после 9 активаций.' },
+        { id:'p_rotten', type:'passive', chance:0.10, icon:'🤢', name:'Гнилой перчик', cost:2, rarity:'rare', bonusLuck:0, desc:'Удача +[Бонус] (Активируется случайно: 10%). Бонус растет на 3 за каждые 3+ комбо в спине. Сброс в конце раунда.' },
+        { id:'cat_food', type:'passive', icon:'🥫', name:'Кошачий корм', cost:4, rarity:'common', desc:'Дает +2 спина при покупке любой сессии.' },
+        { id:'t_toy', type:'passive', icon:'🚂', name:'Игр. поезд', cost:1, rarity:'common', desc:'2 спина без наград: Удача +5 на след. спин. (+2 за каждое след. срабатывание)' },
+        { id:'t_steam', type:'passive', icon:'🛤️', name:'Паровоз', cost:2, rarity:'rare', desc:'3 спина без наград: навсегда +база к цене всех символов.' },
+        { id:'t_diesel', type:'passive', icon:'🚆', name:'Тепловоз', cost:2, rarity:'rare', desc:'3 спина без наград: навсегда +база к множителю всех комбо.' },
+        { id:'d4', type:'passive', icon:'🎲', name:'D4', cost:3, rarity:'rare', desc:'Активируется случайно (30%): заменяет несыгравшие символы на текущем спине.' },
+        { id:'cardboard', type:'instant', icon:'📦', name:'Картонный дом', cost:2, rarity:'instant', desc:'Мгновенно: +1 место для талисманов.' },
+        { id:'fake_coin', type:'passive', chance:0.10, icon:'🪙', name:'Фальшивая монета', cost:1, rarity:'common', desc:'Активируется случайно (10%): +1 спин, также Удача+4 для этого спина.' },
+        { id:'horseshoe', type:'passive', icon:'🧲', name:'Подкова', cost:3, rarity:'common', desc:'Талисманы со случайной активацией срабатывают в 2 раза чаще.' },
+        { id:'battery', type:'instant', icon:'🔋', name:'Аккумулятор', cost:2, rarity:'instant', desc:'Мгновенно: Восстанавливает всю ⚡ всех активных предметов.' },
+        { id:'red_gem', type:'active', icon:'♦️', name:'Красный самоцвет', cost:1, rarity:'common', eCost:1, maxE:1, energy: 1, isActive: false, desc:'Активируется кнопкой (1 ⚡): +4 Удачи для следующего спина.' }
+    ];
+
+    const goldCfg = {0:{r:'rare',c:3}, 1:{r:'rare',c:3}, 2:{r:'uncommon',c:3}, 3:{r:'uncommon',c:3}, 4:{r:'common',c:2}, 5:{r:'common',c:2}, 6:{r:'common',c:1}};
+    const snapCfg = {0:{r:'common',c:2}, 1:{r:'common',c:2}, 2:{r:'uncommon',c:3}, 3:{r:'uncommon',c:3}, 4:{r:'uncommon',c:4}, 5:{r:'uncommon',c:4}, 6:{r:'rare',c:4}};
+
+    let shopItems = [];
+
+    const gridEl = document.getElementById('grid');
+    for(let i=0; i<15; i++) { let d = document.createElement('div'); d.className = 'slot'; d.id = `s-${i}`; d.innerText = '●'; gridEl.appendChild(d); }
+
+    function rMini(coords) {
+        if(!coords) return '';
+        let h = '<div class="mini-grid">';
+        for(let r=0; r<3; r++) for(let c=0; c<5; c++) h += `<div class="mini-cell ${coords.some(p=>p[0]===r&&p[1]===c)?'active':''}"></div>`;
+        return h + '</div>';
+    }
+
+    function ui() {
+        if(isDead) return;
+        try {
+            document.getElementById('ui-bal').innerText = Math.floor(state.bal);
+            document.getElementById('ui-tick').innerText = state.tickets;
+            document.getElementById('ui-luck').innerText = state.luck + state.gemLuck;
+            document.getElementById('ui-round').innerText = state.round;
+            document.getElementById('ui-ses-played').innerText = state.sesPlayed;
+            document.getElementById('ui-tax').innerText = Math.floor(state.tax);
+            document.getElementById('ui-gmult').innerText = (state.gMult || 1.0).toFixed(1);
+            
+            document.getElementById('ui-c7').innerText = state.cost7;
+            document.getElementById('ui-c3').innerText = state.cost3;
+            document.getElementById('ui-refcost').innerText = state.refCost;
+            document.getElementById('ui-slots').innerText = state.inv.length;
+            document.getElementById('ui-max-slots').innerText = state.maxSlots;
+            
+            let btnSpin = document.getElementById('btn-spin');
+            btnSpin.innerText = `КРУТИТЬ (${state.spins})`;
+            btnSpin.disabled = isSpinning || state.spins <= 0 || auto;
+            document.getElementById('btn-ses7').disabled = state.bal < state.cost7 || state.spins > 0 || auto;
+            document.getElementById('btn-ses3').disabled = state.bal < state.cost3 || state.spins > 0 || auto;
+
+            let activeCam = state.inv.find(i => i.id.startsWith('a_') && i.isActive);
+            let camBoost = activeCam ? 30 * (activeCam.activeStacks || 1) : 0; // Считаем стаки
+            let tW = syms.reduce((a,b)=>a + (b.w + (activeCam && activeCam.targetId===b.id ? camBoost : 0)), 0) || 1;
+            
+            document.getElementById('ui-symbols').innerHTML = syms.map(s => `<tr><td class="emoji-cell">${s.char||'?'}</td><td>${s.price||0} (${s.base||0})</td><td>${(((s.w + (activeCam && activeCam.targetId===s.id ? camBoost : 0))/tW)*100).toFixed(1)}%</td></tr>`).join('');
+            
+            document.getElementById('ui-symbols').innerHTML = syms.map(s => `<tr><td class="emoji-cell">${s.char||'?'}</td><td>${s.price||0} (${s.base||0})</td><td>${(((s.w + (activeCam && activeCam.targetId===s.id ? 30 : 0))/tW)*100).toFixed(1)}%</td></tr>`).join('');
+
+            document.getElementById('ui-combos').innerHTML = Object.entries(combos).map(([name, data]) => {
+                let pat = pats.find(p=>p.g===name); let mini = pat ? rMini(pat.c) : '';
+                return `<div class="combo-row"><div style="display:flex; gap:10px; align-items:center;">${mini} ${name}</div><span style="color:var(--green)">X${((data.m||0)+(data.b||0)).toFixed(1)}</span></div>`;
+            }).join('');
+
+            document.getElementById('ui-debt').innerText = Math.floor(state.debt);
+            document.getElementById('ui-timer').innerText = state.timer;
+            document.getElementById('btn-loan').disabled = state.debt > 0;
+            document.getElementById('btn-pay10').disabled = state.debt <= 0 || state.bal < Math.ceil(state.debt*0.1);
+            document.getElementById('btn-payall').disabled = state.debt <= 0 || state.bal < state.debt;
+
+            updateActionBtn(); renderInv(); renderShop();
+        } catch (e) { document.getElementById('log').innerHTML = `<span style="color:var(--red); font-size:18px;">UI_ERR: ${e.message}</span>`; }
+    }
+
+    const tt = document.getElementById('tooltip');
+    let hoveredInvIdx = null;
+    document.addEventListener('mousemove', e => {
+        let tItem = e.target.closest('.talisman-item');
+        if(tItem) {
+            hoveredInvIdx = tItem.dataset.idx; let item = state.inv[hoveredInvIdx]; if(!item) return;
+            let usesText = item.usesLeft !== undefined ? `<br><span style="color:var(--green)">Осталось: ${item.usesLeft}</span>` : '';
+            let energyText = item.type === 'active' ? `<br><span style="color:var(--energy)">⚡ Энергия: ${item.energy}/${item.maxE} (Расход: ${item.eCost})</span>` : '';
+            if(item.id === 'p_rotten') usesText = `<br><span style="color:var(--amber)">Накоплено бонуса: +${item.bonusLuck}</span>`;
+            let sellPrice = Math.floor((item.cost||0) / 2);
+            tt.innerHTML = `<h3 class="rarity-${item.rarity}" style="margin:0; font-family:'Apple Color Emoji', 'VT323', monospace">${item.icon} ${item.name}</h3><span style="color:var(--dim)">[${item.type}]</span><br><p style="margin:5px 0">${item.desc}</p>${usesText}${energyText}
+            <button class="btn btn-sell" onclick="sellItem(${hoveredInvIdx})">ПРОДАТЬ ЗА ${sellPrice} 🎫</button>`;
+            tt.style.left = (e.clientX + 15) + 'px'; tt.style.top = (e.clientY + 15) + 'px'; tt.style.display = 'block';
+        } else if(!e.target.closest('#tooltip')) { tt.style.display = 'none'; hoveredInvIdx = null; }
+    });
+
+    function renderInv() {
+        document.getElementById('ui-inventory').innerHTML = state.inv.map((item, i) => `
+            <div class="talisman-item ${item.isProcced ? 'pepper-proc' : ''}" data-idx="${i}">
+                ${item.icon||'?'}
+                ${item.usesLeft !== undefined ? `<div class="badge">${item.usesLeft}</div>` : ''}
+                ${item.type === 'active' ? `<div class="badge energy">${item.energy}</div>` : ''}
+            </div>
+        `).join('');
+    }
+
+    window.sellItem = function(idx) {
+        let item = state.inv[idx]; if(!item) return;
+        state.tickets += Math.floor((item.cost||0) / 2);
+        state.inv.splice(idx, 1);
+        if(item.id === 'red_gem') state.gemLuck = 0; // Сброс бонуса если продан
+        tt.style.display = 'none'; snd.buy(); ui();
+    };
+
+    function buildPool() {
+        let pool = [...tDB_base];
+        syms.forEach(s => {
+            if(goldCfg[s.id]) pool.push({ id:'g_'+s.id, type:'golden', targetId:s.id, icon:'🌟', name:'Золотой '+s.char, cost:goldCfg[s.id].c, rarity:goldCfg[s.id].r, desc:`20% шанс золотой ячейки. Повышает ценность символа на базовое значение при комбо.`});
+            if(snapCfg[s.id]) pool.push({ id:'a_'+s.id, type:'active', targetId:s.id, icon:'📸', targetChar: s.char, name:'Снимок '+s.char, cost:snapCfg[s.id].c, rarity:snapCfg[s.id].r, eCost: 4, maxE: 4, energy: 4, isActive: false, desc:`Активируется кнопкой (4 ⚡): Резко повышает шанс ${s.char} до налога. Макс: 4 ⚡.`});
+        });
+        return pool.filter(p => {
+            if(p.id === 'cardboard' && state.purchasedInstants.includes('cardboard')) return false; // Картонный дом 1 раз
+            if(p.type === 'instant') return true;
+            return !state.inv.some(inv => inv.id === p.id);
+        });
+    }
+
+    function getRandomRarity() { let r = Math.random(); if(r < 0.02) return 'legendary'; if(r < 0.15) return 'rare'; if(r < 0.40) return 'uncommon'; return 'common'; }
+
+    function genShop() {
+        try {
+            let fullPool = buildPool(); shopItems = [];
+            for(let i=0; i<4; i++) {
+                let tr = getRandomRarity();
+                let filtered = fullPool.filter(p => p.rarity === tr && !shopItems.some(si => si.id === p.id));
+                if(filtered.length === 0) filtered = fullPool.filter(p => !shopItems.some(si => si.id === p.id));
+                if(filtered.length === 0) continue; 
+                let item = {...filtered[Math.floor(Math.random()*filtered.length)]};
+                if(item.type === 'passive' && item.usesMax) item.usesLeft = item.usesMax;
+                shopItems.push(item);
+            }
+        } catch(e) { console.error("Shop Gen Error", e); }
+    }
+
+    function refreshShop() { if(state.bal >= state.refCost && state.spins === 0 && !auto) { state.bal -= state.refCost; state.refCost+=2; snd.buy(); genShop(); ui(); } }
+
+    function renderShop() {
+        document.getElementById('ui-shop').innerHTML = shopItems.map((it, i) => {
+            let limitReached = (it.type !== 'instant' && state.inv.length >= state.maxSlots);
+            return `<div class="shop-card">
+                <div><h4 class="rarity-${it.rarity}">${it.icon||''} ${it.name||'??'}</h4><p>${it.desc||''}</p></div>
+                <button class="btn" style="width:100%; font-size:18px; padding:8px; border-color:var(--dim)" onclick="buy(${i})" ${(state.tickets<(it.cost||0) || state.spins>0 || it.sold || auto || limitReached)?'disabled':''}>${it.sold?'ПРОДАНО':(limitReached&&!it.sold&&it.type!=='instant'?'НЕТ МЕСТ':(it.cost||0)+' 🎫')}</button>
+            </div>`;
+        }).join('');
+    }
+
+    function buy(i) {
+        let it = shopItems[i]; if(!it) return;
+        if(state.tickets >= it.cost) {
+            state.tickets -= it.cost; snd.buy(); it.sold = true;
+            if(it.type === 'instant') {
+                if(it.id === 'cardboard') { state.maxSlots++; state.purchasedInstants.push('cardboard'); }
+                if(it.id === 'battery') { state.inv.forEach(t => { if(t.type === 'active') t.energy = t.maxE; }); }
+            } else {
+                state.inv.push({...it});
+            }
+            ui();
+        }
+    }
+
+    function updateActionBtn() {
+        let btn = document.getElementById('btn-action');
+        let canUseAny = false;
+        
+        // Убрали проверку на !t.isActive, чтобы кнопка всегда загоралась при наличии энергии
+        state.inv.forEach(t => { if(t.type === 'active' && t.energy >= t.eCost) canUseAny = true; });
+        
+        if(!canUseAny || auto) {
+            btn.style.borderColor = "var(--dim)"; btn.style.color = "var(--dim)"; btn.disabled = true;
+        } else {
+            btn.style.borderColor = "var(--energy)"; btn.style.color = "var(--energy)"; btn.disabled = false;
+        }
+    }
+
+    function useActionBtn() {
+        let used = false;
+        state.inv.forEach(t => {
+            if(t.type === 'active' && t.energy >= t.eCost) {
+                t.energy -= t.eCost;
+                if(t.id.startsWith('a_')) {
+                    t.isActive = true;
+                    t.activeStacks = (t.activeStacks || 0) + 1; // Накапливаем стаки снимка!
+                }
+                if(t.id === 'red_gem') state.gemLuck += 4;
+                used = true;
+            }
+        });
+        if(used) {
+            snd.cam(); let flash = document.getElementById('flash-overlay'); flash.classList.remove('flash-anim'); void flash.offsetWidth; flash.classList.add('flash-anim'); ui();
+        }
+    }
+
+    function takeLoan() { if(state.debt===0) { state.bal+=500; state.debt=500; state.timer=60; startLoan(); ui(); } }
+    function payLoan(p) { let a = p===1?state.debt:Math.ceil(state.debt*0.1); if(state.bal>=a && state.debt>0) { state.bal-=a; state.debt-=a; state.timer=60; if(state.debt<=0) {state.debt=0; clearInterval(loanInt); loanInt=null;} ui(); } }
+    function startLoan() {
+        if(loanInt) clearInterval(loanInt);
+        loanInt = setInterval(()=>{
+            if(isDead) return; state.timer--; ui();
+            if(state.timer<=0) { snd.alert(); document.getElementById('screen-collector').style.display='flex'; isDead=true; auto=false; }
+        }, 1000);
+    }
+
+    let colInt;
+    function summonCollectors() {
+        let targetBal = state.bal - state.debt; if(targetBal < state.cost3) targetBal = state.cost3;
+        state.debt = 0; clearInterval(loanInt); loanInt=null;
+        let targetLuck = state.luck - (Math.floor(Math.random()*3)+1); document.getElementById('col-btn').style.display = 'none';
+        colInt = setInterval(() => {
+            if(state.bal > targetBal) { state.bal -= Math.ceil((state.bal-targetBal)*0.1 + 1); if(state.bal<targetBal) state.bal=targetBal; }
+            if(state.luck > targetLuck) state.luck--;
+            document.getElementById('col-money').innerText = `Баланс: ${Math.floor(state.bal)}`; document.getElementById('col-luck').innerText = `Удача: ${state.luck}`; snd.err();
+            if(state.bal === targetBal && state.luck === targetLuck) { clearInterval(colInt); document.getElementById('col-btn').style.display = 'block'; }
+        }, 100);
+    }
+    function closeCollectors() { document.getElementById('screen-collector').style.display='none'; isDead = false; ui(); }
+    new MutationObserver((m) => { m.forEach((mu) => { if(mu.target.style.display === 'flex' && mu.target.id === 'screen-collector') summonCollectors(); }); }).observe(document.getElementById('screen-collector'), { attributes: true, attributeFilter: ['style'] });
+
+    function checkRoundEnd() {
+        state.sesPlayed++;
+        if(state.sesPlayed >= 5) {
+            isDead = true; auto = false; document.getElementById('tax-details').innerText = `К ОПЛАТЕ: ${Math.floor(state.tax)} Φ`; document.getElementById('screen-tax').style.display = 'flex';
+        } else { ui(); } 
+    }
+    
+    // --- УЛУЧШЕНИЯ ПОСЛЕ НАЛОГА ---
+    const upgCommon = [
+        { t: "Утроить ценность 7️⃣", a: () => { syms[6].price*=3; syms[6].base*=3; } },
+        { t: "Навсегда +1 к Базовой Удаче", a: () => { state.luck += 1; } },
+        { t: "X2 ценность 🍀 и 🔔", a: () => { syms[2].price*=2; syms[2].base*=2; syms[3].price*=2; syms[3].base*=2; } },
+        { t: "X2 ценность 🍋 и 🍒", a: () => { syms[0].price*=2; syms[0].base*=2; syms[1].price*=2; syms[1].base*=2; } },
+        { t: "Комбо >= 4: +База к множителю", a: () => { ["Гор. L", "Гор. XL", "Вверх/Вниз", "Небо/Земля", "Глаз", "Джекпот"].forEach(k => combos[k].b += combos[k].m); } },
+        { t: "+1 Место для талисмана", a: () => { state.maxSlots++; } },
+        { t: "X2 ценность Джекпота", a: () => { combos["Джекпот"].m *= 2; } },
+        { t: "Восстановить всю ⚡", a: () => { state.inv.forEach(t => { if(t.type === 'active') t.energy = t.maxE; }); } },
+        { t: "💎 и 🎁 падают чаще", a: () => { syms[4].w += 10; syms[5].w += 10; } },
+        { t: "+5 Билетов 🎫", a: () => { state.tickets += 5; } }
+    ];
+    const upgRare = [
+        { t: "Навсегда +3 к Базовой Удаче", a: () => { state.luck += 3; } },
+        { t: "Билеты X2, Монеты = 0", a: () => { state.tickets *= 2; state.bal = 0; } },
+        { t: "Монеты X2, Билеты = 0", a: () => { state.bal *= 2; state.tickets = 0; } },
+        { t: "Навсегда шанс уменьшается 🍀 и 🔔 на 2", a: () => { syms[2].w = Math.max(1, Math.floor(syms[2].w/2)); syms[3].w = Math.max(1, Math.floor(syms[3].w/2)); } },
+        { t: "Навсегда шанс уменьшается 🍋 и 🍒 на 2", a: () => { syms[0].w = Math.max(1, Math.floor(syms[0].w/2)); syms[1].w = Math.max(1, Math.floor(syms[1].w/2)); } },
+        { t: "Навсегда шанс уменьшается 💎, 🎁, 7️⃣ на 2", a: () => { syms[4].w = Math.max(1, Math.floor(syms[4].w/2)); syms[5].w = Math.max(1, Math.floor(syms[5].w/2)); syms[6].w = Math.max(1, Math.floor(syms[6].w/2)); } }
+    ];
+
+    function showUpgrades() {
+        let pool = []; let choices = [];
+        while(choices.length < 3) {
+            let isRare = Math.random() < 0.10;
+            let src = isRare ? upgRare : upgCommon;
+            let item = src[Math.floor(Math.random() * src.length)];
+            if(!choices.some(c => c.t === item.t)) { choices.push({...item, isRare}); }
+        }
+        
+        let container = document.getElementById('upgrade-container');
+        container.innerHTML = choices.map((c, i) => `
+            <div class="upg-card ${c.isRare ? 'upg-red' : ''}" onclick="selectUpgrade(${i})">
+                <h3 style="color:inherit; text-align:center;">${c.isRare ? 'УСИЛЕННОЕ УЛУЧШЕНИЕ' : '✔️ УЛУЧШЕНИЕ'}</h3>
+                <p style="font-size:24px; text-align:center;">${c.t}</p>
+            </div>
+        `).join('');
+        
+        window.tempChoices = choices;
+        document.getElementById('screen-upgrades').style.display = 'flex';
+    }
+
+    window.selectUpgrade = function(idx) {
+        let upg = window.tempChoices[idx]; if(upg && upg.a) upg.a();
+        document.getElementById('screen-upgrades').style.display = 'none';
+        snd.buy();
+        isDead = false; genShop(); ui();
+    };
+
+    function payTax() {
+        if(state.bal >= state.tax) {
+            state.bal -= state.tax; document.getElementById('screen-tax').style.display = 'none';
+            let taxMultiplier = 1.5 + (state.round * 0.5); 
+            state.tax = Math.floor(state.tax * taxMultiplier); 
+            state.round++; state.sesPlayed = 0; 
+            state.cost7 = Math.floor(state.cost7 * 1.3); 
+            state.cost3 = Math.floor(state.cost3 * 1.3);
+            state.refCost += 2; 
+            
+            // Сброс активных эффектов
+            state.inv.forEach(i => {
+                if(i.id.startsWith('a_')) { i.isActive = false; i.activeStacks = 0; }
+                if(i.id === 'p_rotten') i.bonusLuck = 0;
+            });
+            state.gemLuck = 0;
+            
+            showUpgrades(); // Показываем награды вместо мгновенного продолжения
+        } else { document.getElementById('screen-tax').style.display = 'none'; document.getElementById('screen-jail').style.display = 'flex'; }
+    }
+
+    function toggleAuto() {
+        auto = !auto; let btn = document.getElementById('btn-auto');
+        if(auto) { btn.innerText="АВТО: ВКЛ"; btn.style.color="#000"; btn.style.background="var(--green)"; runAuto(); }
+        else { btn.innerText="АВТО: ВЫКЛ"; btn.style.color="var(--amber)"; btn.style.background="#000"; } ui();
+    }
+    async function runAuto() { if(!auto || isDead) return; if(state.spins > 0) { await spin(); if(auto) setTimeout(runAuto, 400); } else { toggleAuto(); } }
+
+    function buySession(type) { 
+        let cost = type === 7 ? state.cost7 : state.cost3; let ticks = type === 7 ? 1 : 2;
+        if(state.bal>=cost && state.spins===0) { 
+            state.bal-=cost; state.tickets+=ticks; 
+            let bonusSpins = state.inv.some(i=>i.id==='cat_food') ? 2 : 0;
+            state.spins = type + bonusSpins; snd.buy(); 
+            ui(); 
+        } 
+    }
+
+    function getWinningCombos(matrix) {
+        let mPats = []; let wCoords = [];
+        pats.forEach(p => {
+            if(!p.c || p.c.length === 0) return;
+            let fChar = matrix[p.c[0][0]][p.c[0][1]].char;
+            if(p.c.every(pos => matrix[pos[0]][pos[1]].char === fChar)) {
+                mPats.push(p);
+                p.c.forEach(pos => { if(!wCoords.some(c => c[0]===pos[0]&&c[1]===pos[1])) wCoords.push(pos); });
+            }
+        });
+        return { mPats, wCoords };
+    }
+
+    async function spin() {
+        if(state.spins <= 0 || isSpinning) return;
+        isSpinning = true; state.spins--; document.getElementById('log').innerText = "ОБРАБОТКА ДАННЫХ...";
+        document.querySelectorAll('.slot').forEach(s => { s.className = 'slot'; s.style.transform = 'scale(0.9)'; }); ui();
+
+        let curLuck = state.luck + state.gemLuck; state.gemLuck = 0;
+        let trashQueue = [];
+        
+        // --- ИСПРАВЛЕНИЕ ИГРУШЕЧНОГО ПОЕЗДА ---
+        if(state.emptySpins >= 2) { 
+            let toy = state.inv.find(i=>i.id==='t_toy'); 
+            if(toy) { 
+                state.toyTrainCount++; 
+                curLuck += 5 + (state.toyTrainCount - 1)*2; 
+                toy.isProcced = true; snd.pepper(); // Теперь поезд будет подпрыгивать и звенеть!
+                setTimeout(() => { toy.isProcced = false; ui(); }, 500);
+            } 
+        } else { state.toyTrainCount = 0; }
+
+        let procMult = state.inv.some(i=>i.id==='horseshoe') ? 2 : 1;
+
+        state.inv.forEach((t, idx) => {
+            if(t.type === 'passive' && t.chance && Math.random() < (t.chance * procMult)) { 
+                if(t.id === 'fake_coin') { state.spins++; curLuck += 4; }
+                else if(t.id === 'p_rotten') { curLuck += (t.baseLuck||9) + t.bonusLuck; }
+                else { curLuck += (t.luck||0); }
+                
+                if(t.usesLeft !== undefined) t.usesLeft--; 
+                t.isProcced = true; snd.pepper();
+                setTimeout(() => { t.isProcced = false; ui(); }, 500);
+                if(t.usesLeft !== undefined && t.usesLeft <= 0) trashQueue.push(idx);
+            }
+        });
+        trashQueue.reverse().forEach(idx => state.inv.splice(idx, 1));
+        if(trashQueue.length > 0 || state.inv.some(t=>t.isProcced)) ui();
+
+        let activeCam = state.inv.find(i => i.id.startsWith('a_') && i.isActive);
+        let camBoost = activeCam ? 30 * (activeCam.activeStacks || 1) : 0;
+        let matrix = [[],[],[]];
+        
+        async function rollBoard(skipCoords = []) {
+            for(let c=0; c<5; c++) {
+                let rolledCol = false;
+                for(let r=0; r<3; r++) {
+                    if(skipCoords.some(coord => coord[0]===r && coord[1]===c)) continue;
+                    
+                    let wData = syms.map(s => {
+                        let w = s.w; 
+                        
+                        // 1. Удача слегка повышает шанс на дорогие символы (как раньше)
+                        if(s.base >= 5) w += Math.max(0, Math.floor(curLuck / 2)); 
+                        
+                        // 2. НОВАЯ МЕХАНИКА: МАГНЕТИЗМ КОМБО!
+                        // Проверяем, есть ли такой же символ слева или сверху
+                        let isNeighbor = false;
+                        if (c > 0 && matrix[r][c-1] && matrix[r][c-1].id === s.id) isNeighbor = true;
+                        if (r > 0 && matrix[r-1][c] && matrix[r-1][c].id === s.id) isNeighbor = true;
+                        
+                        // За каждую 1 ед. Удачи символ получает +6 к "липкости" (весу)
+                        if (isNeighbor) {
+                            w += curLuck * 20; 
+                        }
+
+                        // Камера дает направленный, очень сильный магнит
+                        if(activeCam && activeCam.targetId === s.id) w += camBoost; return { ...s, curW: w };
+                        
+                        // Вес не может быть меньше 1 (чтобы игра не сломалась от жестких минусов)
+                        return { ...s, curW: Math.max(1, w) }; 
+                    });
+
+                    let totW = wData.reduce((a,b)=>a+b.curW,0) || 1; 
+                    let rnd = Math.random()*totW; 
+                    let sym = wData[0];
+                    for(let item of wData) { if(rnd < item.curW) { sym = item; break; } rnd -= item.curW; }
+                    
+                    let isGold = state.inv.some(t => t.type === 'golden' && t.targetId === sym.id) && Math.random() < 0.20;
+                    matrix[r][c] = { ...sym, isGold };
+                    
+                    let slot = document.getElementById(`s-${r*5+c}`);
+                    slot.innerText = sym.char || '?'; 
+                    if(isGold) slot.classList.add('golden'); else slot.classList.remove('golden');
+                    slot.style.transform = 'scale(1)';
+                    rolledCol = true;
+                }
+                if(rolledCol) { snd.stop(); await new Promise(res => setTimeout(res, 80)); }
+            }
+        }
+
+        await rollBoard(); let ev = getWinningCombos(matrix);
+
+        let d4 = state.inv.find(i=>i.id==='d4');
+        if(d4 && Math.random() < (0.30 * procMult) && ev.wCoords.length < 15) {
+            document.getElementById('log').innerText = "D4: ПЕРЕБРОС НЕАКТИВНЫХ...";
+            snd.d4(); d4.isProcced = true; setTimeout(() => { d4.isProcced = false; ui(); }, 500); ui();
+            for(let r=0; r<3; r++) { for(let c=0; c<5; c++) { if(!ev.wCoords.some(coord=>coord[0]===r&&coord[1]===c)) document.getElementById(`s-${r*5+c}`).classList.add('d4-reroll'); } }
+            
+            // === ПАУЗА 1: Сколько крутятся сами символы D4 (было 500) ===
+            await new Promise(r=>setTimeout(r, 400));
+            
+            document.querySelectorAll('.slot').forEach(s=>s.classList.remove('d4-reroll'));
+            await rollBoard(ev.wCoords); ev = getWinningCombos(matrix);
+            
+            // === ПАУЗА 2: Ожидание перед началом подсчета комбо после падения (было 1200) ===
+            await new Promise(r=>setTimeout(r, 500)); 
+        }
+
+        if(ev.mPats.length >= 3) {
+            state.inv.forEach(t => { if(t.id === 'p_rotten') t.bonusLuck += 3; });
+        }
+
+        if(ev.mPats.length === 0) {
+            state.emptySpins++; document.getElementById('log').innerText = "ПУСТО";
+            if(state.emptySpins >= 3) {
+                if(state.inv.some(i=>i.id==='t_steam')) { syms.forEach(s=>s.price+=(s.base||0)); document.getElementById('log').innerText="ПАРОВОЗ: ЦЕНЫ АП!"; snd.winCombo();}
+                if(state.inv.some(i=>i.id==='t_diesel')) { Object.values(combos).forEach(c=>c.b+=(c.m||0)); document.getElementById('log').innerText="ТЕПЛОВОЗ: МНОЖИТЕЛИ АП!"; snd.winCombo();}
+            }
+        } else {
+            state.emptySpins = 0; let totalWin = 0;
+            
+            // --- НОВАЯ СИСТЕМА ПОДСЧЕТА ЗОЛОТЫХ В РЕАЛЬНОМ ВРЕМЕНИ ---
+            for(let i = 0; i < ev.mPats.length; i++) {
+                let match = ev.mPats[i];
+                let fChar = matrix[match.c[0][0]][match.c[0][1]].char;
+                let sObj = syms.find(s => s.char === fChar);
+                let grp = combos[match.g];
+                
+                // Высчитываем по ТЕКУЩЕЙ (возможно уже повышенной) цене
+                let payout = sObj.price * (grp.m + grp.b) * (state.gMult || 1.0);
+                totalWin += payout; state.bal += payout;
+                
+                match.c.forEach(pos => document.getElementById(`s-${pos[0]*5+pos[1]}`).classList.add('win'));
+                document.getElementById('log').innerHTML = `КОМБО <span style="color:#fff">${match.g}</span>: +${payout.toFixed(1)} Φ`;
+                
+                if(match.g === "Джекпот") {
+                    snd.jackpot();
+                    
+                    // БЕЗОПАСНАЯ АКТИВАЦИЯ СВЕЧЕНИЯ
+                    let jfx = document.getElementById('jackpot-fx');
+                    if(!jfx) {
+                        jfx = document.createElement('div');
+                        jfx.id = 'jackpot-fx';
+                        jfx.className = 'jackpot-effect';
+                        document.body.appendChild(jfx);
+                    }
+                    jfx.style.display = 'block';
+                    document.getElementById('grid').classList.add('glow-jackpot');
+                    
+                    setTimeout(() => { 
+                        jfx.style.display = 'none'; 
+                        document.getElementById('grid').classList.remove('glow-jackpot');
+                    }, 3000);
+                } else {
+                    snd.winCombo();
+                }
+                
+                ui(); 
+                
+                // Ускорение показа, если комбо много
+                let delay = 1000;
+                let goldDelay = 600;
+                if(i >= 1) {
+                    let speedFactor = Math.pow(0.6, i - 2); // Прогрессивное ускорение
+                    delay = Math.max(100, delay * speedFactor);
+                    goldDelay = Math.max(100, goldDelay * speedFactor);
+                }
+
+                await new Promise(r=>setTimeout(r, delay));
+                match.c.forEach(pos => document.getElementById(`s-${pos[0]*5+pos[1]}`).classList.remove('win'));
+
+                // Смотрим, сколько золотых символов ИМЕННО В ЭТОЙ комбинации
+                let goldCount = match.c.filter(pos => matrix[pos[0]][pos[1]].isGold).length;
+                if(goldCount > 0) {
+                    let boost = (sObj.base || 0) * goldCount;
+                    sObj.price += boost; // Мгновенно повышаем цену в базе
+                    document.getElementById('log').innerHTML = `<span style="color:var(--amber)">${sObj.char} БАЗА +${boost}!</span>`;
+                    snd.buy(); ui();
+                    await new Promise(r=>setTimeout(r, goldDelay)); // Пауза, чтобы игрок увидел апгрейд
+                }
+            }
+            document.getElementById('log').innerText = `ОБЩИЙ ДОХОД: +${totalWin.toFixed(1)} Φ`;
+        }
+
+        isSpinning = false; 
+        if(state.spins === 0) {
+            state.inv.forEach(i => { if(i.type === 'active') i.energy = Math.min(i.maxE, i.energy + 1); });
+            checkRoundEnd(); 
+        }
+        ui();
+    }
+
+    function exportJSON() { let a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({state, syms, combos, shopItems})], {type:"application/json"})); a.download = 'casino_save.json'; a.click(); }
+    function importJSON(e) {
+        let f = e.target.files[0]; if(!f) return; let r = new FileReader();
+        r.onload = (ev) => {
+            try {
+                let d = JSON.parse(ev.target.result);
+                if(d.state) { Object.keys(d.state).forEach(k => { if(state[k] !== undefined) state[k] = d.state[k]; }); }
+                if(d.syms) d.syms.forEach(sv => { let t = syms.find(x=>x.id===sv.id); if(t && sv.price) t.price = sv.price; });
+                if(d.combos) Object.keys(d.combos).forEach(k => { if(combos[k] && d.combos[k].b !== undefined) combos[k].b = d.combos[k].b; });
+                if(d.shopItems) shopItems = d.shopItems; 
+                if(state.debt > 0 && !loanInt) startLoan(); ui();
+            } catch(err) { document.getElementById('log').innerHTML = `<span style="color:var(--red);">SAVE_ERR: Ошибка файла</span>`; }
+        }; r.readAsText(f);
+    }
+
+    genShop(); ui();
+</script>
+</body>
+</html>
