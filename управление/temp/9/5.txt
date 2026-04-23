@@ -1,0 +1,42 @@
+def compare_confidence_thresholds(img, thresholds=[0.3, 0.5, 0.7, 0.9]):
+    """
+    Сравнение детекции с разными порогами уверенности
+    """
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    axes = axes.ravel()
+    
+    for i, conf_thresh in enumerate(thresholds):
+        # Выполняем детекцию
+        results = model(img)
+        
+        if isinstance(results, list):
+            result = results[0]
+        else:
+            result = results
+        
+        boxes = result.boxes
+        img_copy = img.copy()
+        
+        if boxes is not None:
+            for box in boxes:
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
+                conf = box.conf[0].cpu().numpy()
+                cls = int(box.cls[0].cpu().numpy())
+                
+                # Фильтруем по порогу
+                if conf >= conf_thresh:
+                    cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    label = f"{model.names[cls]}: {conf:.2f}"
+                    cv2.putText(img_copy, label, (x1, y1-10), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        
+        axes[i].imshow(img_copy)
+        axes[i].set_title(f'Порог уверенности: {conf_thresh}')
+        axes[i].axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
+
+# Сравниваем пороги на первом изображении
+compare_confidence_thresholds(img1)

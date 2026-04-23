@@ -1,0 +1,13 @@
+!pip install ultralytics opencv-python matplotlib numpy
+import cv2
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from ultralytics import YOLO
+from PIL import Image
+import requests
+from io import BytesIO
+model = YOLO('yolov8n.pt')
+print("Модель YOLOv8 успешно загружена!")
+print(f"Доступные классы: {model.names}")
+print(f"Всего классов: {len(model.names)}")

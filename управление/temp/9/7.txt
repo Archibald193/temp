@@ -1,0 +1,24 @@
+def save_detection_results(img, results, output_path="detection_result.jpg"):
+    """
+    Сохранение изображения с результатами детекции
+    """
+    if isinstance(results, list):
+        result = results[0]
+    else:
+        result = results
+    
+    # Получаем изображение с нарисованными боксами
+    annotated_img = result.plot()
+    
+    # Конвертируем BGR в RGB для корректного сохранения
+    annotated_img_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
+    
+    # Сохраняем
+    cv2.imwrite(output_path, cv2.cvtColor(annotated_img_rgb, cv2.COLOR_RGB2BGR))
+    print(f"Результат сохранен в {output_path}")
+    
+    return annotated_img_rgb
+
+
+# Сохраняем результат для первого изображения
+saved_img = save_detection_results(img1, results1, "yolo_detection_bus.jpg")

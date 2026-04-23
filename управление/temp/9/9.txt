@@ -1,0 +1,43 @@
+def compare_yolo_models(image_path):
+    """
+    Сравнение разных версий YOLO моделей
+    """
+    img = load_image_from_url(image_path) if image_path.startswith('http') else load_image_from_file(image_path)
+    
+    # Список моделей для сравнения
+    models_to_try = {
+        'YOLOv8n (nano)': 'yolov8n.pt',
+        'YOLOv8s (small)': 'yolov8s.pt',
+        'YOLOv8m (medium)': 'yolov8m.pt'
+    }
+    
+    fig, axes = plt.subplots(1, 3, figsize=(20, 8))
+    
+    for idx, (model_name, model_path) in enumerate(models_to_try.items()):
+        print(f"Загрузка {model_name}...")
+        
+        # Загружаем модель (скачается автоматически)
+        current_model = YOLO(model_path)
+        
+        # Выполняем детекцию
+        results = current_model(img)
+        
+        # Получаем результат с боксами
+        result_img = results[0].plot()
+        result_img_rgb = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
+        
+        # Отображаем
+        axes[idx].imshow(result_img_rgb)
+        axes[idx].set_title(f'{model_name}')
+        axes[idx].axis('off')
+        
+        # Считаем количество объектов
+        num_objects = len(results[0].boxes) if results[0].boxes else 0
+        print(f"  Обнаружено объектов: {num_objects}")
+    
+    plt.tight_layout()
+    plt.show()
+
+
+# Сравниваем модели на тестовом изображении
+compare_yolo_models("https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/bus.jpg")

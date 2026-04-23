@@ -1,0 +1,31 @@
+def detect_on_my_image(image_path):
+    """
+    Детекция на пользовательском изображении
+    """
+    try:
+        # Загружаем изображение
+        if image_path.startswith('http'):  # если это URL
+            img = load_image_from_url(image_path)
+        else:  # если это локальный файл
+            img = load_image_from_file(image_path)
+        
+        print(f"Изображение загружено. Размер: {img.shape}")
+        
+        # Выполняем детекцию
+        results = model(img)
+        
+        # Показываем результат
+        result_img = show_image_with_boxes(img, results)
+        
+        # Анализируем результаты
+        analyze_detection_results(results, "пользовательское изображение")
+        
+        return results
+        
+    except Exception as e:
+        print(f"Ошибка при обработке изображения: {e}")
+        return None
+
+
+# здесь нужно указать имя вашего файла:
+results = detect_on_my_image("3.jpg") # APK.png

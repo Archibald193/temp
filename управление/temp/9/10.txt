@@ -1,0 +1,109 @@
+def detect_on_webcam():
+    """
+    Детекция объектов с веб-камеры в реальном времени
+    Нажмите 'q' для выхода
+    """
+    # Запускаем веб-камеру
+    cap = cv2.VideoCapture(0)
+    
+    if not cap.isOpened():
+        print("Ошибка: Не удалось открыть веб-камеру")
+        return
+    
+    print("Детекция в реальном времени. Нажмите 'q' для выхода...")
+    
+    while True:
+        # Захват кадра
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Детекция на кадре
+        results = model(frame, verbose=False)  # verbose=False отключает вывод в консоль
+        
+        # Отрисовка результатов
+        annotated_frame = results[0].plot()
+        
+        # Отображение
+        cv2.imshow('YOLOv8 Детекция', annotated_frame)
+        
+        # Выход по нажатию 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+# Раскомментируйте для запуска с веб-камерой
+# detect_on_webcam()
+
+
+# ========== обработка видеофайла ==========
+def process_video(video_path, output_path, conf_threshold=0.5):
+    """
+    Обработка видеофайла с детекцией объектов на каждом кадре
+    
+    Параметры:
+    video_path - путь к входному видеофайлу
+    output_path - путь для сохранения обработанного видео
+    conf_threshold - порог уверенности (по умолчанию 0.5)
+    """
+    # Открываем видеофайл
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        print(f"Ошибка: Не удалось открыть видеофайл {video_path}")
+        return
+    
+    # Получаем параметры видео
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    print(f"Видео загружено: {video_path}")
+    print(f"Размер: {width}x{height}, FPS: {fps}, Всего кадров: {total_frames}")
+    
+    # Создаем объект для записи видео
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # кодек для MP4
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    frame_count = 0
+    
+    print("Обработка видео...")
+    
+    while True:
+        # Читаем кадр
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Выполняем детекцию на кадре
+        results = model(frame, conf=conf_threshold, verbose=False)
+        
+        # Получаем кадр с нарисованными боксами
+        annotated_frame = results[0].plot()
+        
+        # Записываем обработанный кадр
+        out.write(annotated_frame)
+        
+        # Обновляем счетчик и выводим прогресс
+        frame_count += 1
+        if frame_count % 30 == 0:  # показываем прогресс каждые 30 кадров
+            print(f"Обработано кадров: {frame_count}/{total_frames} ({frame_count/total_frames*100:.1f}%)")
+    
+    # Освобождаем ресурсы
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
+    
+    print(f"\nОбработка завершена!")
+    print(f"Обработано кадров: {frame_count}")
+    print(f"Результат сохранен в: {output_path}")
+    # ВЫЗОВ ФУНКЦИИ - раскомментируйте и укажите пути к вашему видео
+video_input = "1k.mp4"  # замените на путь к вашему видеофайлу
+video_output = "результат_видео.mp4"      # имя выходного файла
+
+
+process_video(video_input, video_output, conf_threshold=0.5)

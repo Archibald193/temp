@@ -1,0 +1,54 @@
+def load_image_from_url(url):
+    """Загрузка изображения по URL"""
+    response = requests.get(url)
+    img = Image.open(BytesIO(response.content))
+    return np.array(img)
+
+
+def load_image_from_file(path):
+    """Загрузка изображения из файла"""
+    img = cv2.imread(path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
+
+
+def show_image_with_boxes(img, results, conf_threshold=0.5):
+    """
+    Отображение изображения с детектированными объектами
+    """
+    if isinstance(results, list):
+        result = results[0]
+    else:
+        result = results
+    
+    # Получаем боксы, классы и уверенность
+    boxes = result.boxes
+    img_copy = img.copy()
+    
+    if boxes is not None:
+        for box in boxes:
+            # Получаем координаты бокса
+            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
+            conf = box.conf[0].cpu().numpy()
+            cls = int(box.cls[0].cpu().numpy())
+            
+            # Фильтруем по уверенности
+            if conf < conf_threshold:
+                continue
+            
+            # Рисуем прямоугольник
+            cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # Добавляем подпись
+            label = f"{model.names[cls]}: {conf:.2f}"
+            cv2.putText(img_copy, label, (x1, y1-10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    
+    # Отображаем результат
+    plt.figure(figsize=(12, 8))
+    plt.imshow(img_copy)
+    plt.axis('off')
+    plt.title(f'Детекция объектов (порог уверенности: {conf_threshold})')
+    plt.show()
+    
+    return img_copy

@@ -1,0 +1,67 @@
+def interactive_detection_fixed():
+    """
+    Исправленная версия с автоматическим закрытием окон
+    """
+    print("=" * 50)
+    print("ДЕМОНСТРАЦИЯ YOLO ДЕТЕКЦИИ")
+    print("=" * 50)
+    
+    # Список доступных тестовых изображений
+    test_images = {
+        "1": "Уличная сцена (автобус, люди)",
+        "2": "Спортивная сцена (футболисты)",
+        "3": "Своё изображение (URL или путь)"
+    }
+    
+    print("\nДоступные изображения для теста:")
+    for key, desc in test_images.items():
+        print(f"  {key}. {desc}")
+    
+    choice = input("\nВыберите вариант (1-3): ")
+    
+    if choice == "1":
+        url = "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/bus.jpg"
+        img = load_image_from_url(url)
+        img_name = "уличная сцена"
+    elif choice == "2":
+        url = "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/zidane.jpg"
+        img = load_image_from_url(url)
+        img_name = "спортивная сцена"
+    elif choice == "3":
+        path = input("Введите URL или путь к изображению: ")
+        img = detect_on_my_image(path)
+        if img is None:
+            return
+        img_name = "пользовательское изображение"
+    else:
+        print("Неверный выбор")
+        return
+    
+    print(f"\nОбработка {img_name}...")
+    results = model(img)
+    
+    print("\nРезультаты детекции:")
+    analyze_detection_results(results, img_name)
+    
+    # Показываем изображение и автоматически закрываем через 5 секунд
+    print("\nОтображаем результат... Окно закроется через 5 секунд")
+    show_image_with_boxes(img, results)
+    
+    # Таймер для автоматического закрытия
+    import time
+    time.sleep(5)
+    plt.close('all')
+    
+    # Спрашиваем, сохранить ли результат
+    save_choice = input("\nСохранить результат? (y/n): ")
+    if save_choice.lower() == 'y':
+        filename = input("Имя файла для сохранения (по умолчанию: yolo_result.jpg): ")
+        if not filename:
+            filename = "yolo_result.jpg"
+        save_detection_results(img, results, filename)
+    
+    print("Программа завершена!")
+
+
+# Запуск 
+interactive_detection_fixed()

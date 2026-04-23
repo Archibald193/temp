@@ -1,0 +1,46 @@
+def analyze_detection_results(results, img_name):
+    """
+    Анализ результатов детекции
+    """
+    if isinstance(results, list):
+        result = results[0]
+    else:
+        result = results
+    
+    boxes = result.boxes
+    
+    if boxes is None:
+        print("Объекты не обнаружены")
+        return
+    
+    # Собираем статистику
+    detections = []
+    for box in boxes:
+        conf = float(box.conf[0].cpu().numpy())
+        cls = int(box.cls[0].cpu().numpy())
+        class_name = model.names[cls]
+        detections.append({
+            'class': class_name,
+            'confidence': conf
+        })
+    
+    # Выводим статистику
+    print(f"\nРезультаты детекции для {img_name}:")
+    print(f"Всего обнаружено объектов: {len(detections)}")
+    print("\nОбнаруженные объекты:")
+    
+    # Группируем по классам
+    from collections import Counter
+    class_counts = Counter([d['class'] for d in detections])
+    for class_name, count in class_counts.items():
+        print(f"  {class_name}: {count}")
+    
+    print("\nДетальная информация:")
+    for i, det in enumerate(detections, 1):
+        print(f"  {i}. {det['class']} (уверенность: {det['confidence']:.3f})")
+    
+    return detections
+
+
+# Анализируем результаты для первого изображения
+detections1 = analyze_detection_results(results1, "уличная сцена")

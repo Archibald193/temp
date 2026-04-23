@@ -1,0 +1,26 @@
+# Пример 1: Детекция на изображении из интернета (уличная сцена)
+print("Пример 1: Детекция на уличной сцене")
+url = "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/bus.jpg"
+img1 = load_image_from_url(url)
+
+
+# Выполняем детекцию
+results1 = model(img1)
+
+
+# Показываем результат
+show_image_with_boxes(img1, results1, conf_threshold=0.5)
+
+
+# Пример 2: Детекция на другом изображении
+print("Пример 2: Детекция на изображении с животными")
+url2 = "https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/assets/zidane.jpg"
+img2 = load_image_from_url(url2)
+
+
+# Выполняем детекцию
+results2 = model(img2)
+
+
+# Показываем результат
+show_image_with_boxes(img2, results2, conf_threshold=0.5)
