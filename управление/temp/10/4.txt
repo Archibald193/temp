@@ -1,0 +1,26 @@
+def show_sample_images(dataset, num_images=6):
+    """Показывает примеры изображений из датасета"""
+    fig, axes = plt.subplots(1, num_images, figsize=(15, 3))
+    
+    for i in range(num_images):
+        image, label = dataset[i]
+        # Денормализация
+        mean = np.array([0.485, 0.456, 0.406])
+        std = np.array([0.229, 0.224, 0.225])
+        image = image.numpy().transpose(1, 2, 0)
+        image = std * image + mean
+        image = np.clip(image, 0, 1)
+        
+        axes[i].imshow(image)
+        # Показываем только первые 20 символов названия класса
+        class_name = dataset.classes[label]
+        short_name = class_name.split('.')[-1][:25] if '.' in class_name else class_name[:25]
+        axes[i].set_title(short_name, fontsize=8)
+        axes[i].axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+
+
+print("\nПримеры изображений птиц из датасета:")
+show_sample_images(train_dataset)

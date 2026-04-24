@@ -1,0 +1,21 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms, models
+from torch.utils.data import DataLoader, random_split
+import matplotlib.pyplot as plt
+import numpy as np
+import time
+import os
+import requests
+from tqdm import tqdm
+
+
+# Проверка GPU
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Используется устройство: {device}")
+
+
+# Создание папки для данных
+os.makedirs('data', exist_ok=True)
+os.makedirs('models', exist_ok=True)

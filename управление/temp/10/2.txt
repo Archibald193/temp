@@ -1,0 +1,12 @@
+print("\n" + "="*60)
+print("ЗАГРУЗКА ДАТАСЕТА CUB-200-2011 (200 видов птиц)")
+print("="*60)
+
+
+# Скачивание датасета (если нет локально)
+if not os.path.exists('data/CUB_200_2011'):
+    print("Скачивание датасета CUB-200-2011...")
+    !wget -q https://data.caltech.edu/records/65de6-vp158/files/CUB_200_2011.tgz
+    !tar -xzf CUB_200_2011.tgz -C data/
+    !rm CUB_200_2011.tgz
+    print("Датасет загружен и распакован!")

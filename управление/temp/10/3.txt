@@ -1,0 +1,99 @@
+print("\n" + "="*60)
+print("ПРЕДОБРАБОТКА ДАННЫХ")
+print("="*60)
+
+
+# Трансформации для тренировочных данных (с аугментацией)
+train_transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomRotation(15),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                         std=[0.229, 0.224, 0.225])
+])
+# Трансформации для валидации (без аугментации)
+val_transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+                         std=[0.229, 0.224, 0.225])
+])
+
+
+# Загрузка датасета (структура папок должна быть создана)
+# CUB-200-2011 имеет специальную структуру, поэтому используем ImageFolder
+# Предварительно нужно создать папки по классам
+print("Создание структуры папок для ImageFolder...")
+
+
+# Путь к исходным данным
+cub_path = 'data/CUB_200_2011'
+
+
+# Чтение файла с информацией о классах
+import pandas as pd
+
+
+# Загрузка соответствия id -> название класса
+classes_df = pd.read_csv(f'{cub_path}/classes.txt', sep=' ', header=None, names=['id', 'name'])
+class_names = classes_df['name'].values
+
+
+# Загрузка разбиения на train/test
+images_df = pd.read_csv(f'{cub_path}/images.txt', sep=' ', header=None, names=['id', 'path'])
+labels_df = pd.read_csv(f'{cub_path}/image_class_labels.txt', sep=' ', header=None, names=['id', 'label'])
+split_df = pd.read_csv(f'{cub_path}/train_test_split.txt', sep=' ', header=None, names=['id', 'is_train'])
+
+
+# Объединение данных
+data_df = images_df.merge(labels_df, on='id').merge(split_df, on='id')
+
+
+# Создание временной структуры папок для ImageFolder
+temp_train_path = 'data/cub_train'
+temp_val_path = 'data/cub_val'
+
+
+os.makedirs(temp_train_path, exist_ok=True)
+os.makedirs(temp_val_path, exist_ok=True)
+
+
+# Создание папок для каждого класса
+for class_id, class_name in enumerate(class_names, 1):
+    os.makedirs(f'{temp_train_path}/{class_id}_{class_name}', exist_ok=True)
+    os.makedirs(f'{temp_val_path}/{class_id}_{class_name}', exist_ok=True)
+
+
+# Копирование файлов в соответствующие папки
+from shutil import copy2
+
+
+for idx, row in data_df.iterrows():
+    src_path = f"{cub_path}/images/{row['path']}"
+    class_folder = f"{row['label']}_{class_names[row['label']-1]}"
+    
+    if row['is_train'] == 1:
+        dst_path = f"{temp_train_path}/{class_folder}/{row['path'].split('/')[-1]}"
+    else:
+        dst_path = f"{temp_val_path}/{class_folder}/{row['path'].split('/')[-1]}"
+    
+    copy2(src_path, dst_path)
+
+
+print(f"Создано {len(class_names)} классов")
+print(f"Тренировочных изображений: {len(data_df[data_df['is_train']==1])}")
+print(f"Валидационных изображений: {len(data_df[data_df['is_train']==0])}")
+
+
+# Создание датасетов
+train_dataset = datasets.ImageFolder(temp_train_path, transform=train_transform)
+val_dataset = datasets.ImageFolder(temp_val_path, transform=val_transform)
+
+
+# Создание загрузчиков
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=2)
+val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=2)

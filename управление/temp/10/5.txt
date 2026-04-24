@@ -1,0 +1,51 @@
+print("\n" + "="*60)
+print("СОЗДАНИЕ МОДЕЛИ С TRANSFER LEARNING")
+print("="*60)
+
+
+# Загрузка предобученной на ImageNet модели ResNet50
+model = models.resnet50(pretrained=True)
+print("✓ Загружена модель ResNet50, предобученная на ImageNet")
+
+
+# Заморозка всех слоев
+for param in model.parameters():
+    param.requires_grad = False
+
+
+# Количество классов в CUB-200-2011
+num_classes = 200
+
+
+# Замена последнего слоя (классификатора)
+model.fc = nn.Sequential(
+    nn.Dropout(0.2),
+    nn.Linear(2048, 512),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(512, num_classes)
+)
+
+
+# Размораживаем последний блок для дообучения
+for param in model.layer4.parameters():
+    param.requires_grad = True
+# Размораживаем предпоследний блок layer3
+for param in model.layer3.parameters():
+    param.requires_grad = True
+
+# Размораживаем новый классификатор
+for param in model.fc.parameters():
+    param.requires_grad = True
+
+
+model = model.to(device)
+
+
+# Подсчет параметров
+total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+print(f"Всего параметров: {total_params:,}")
+print(f"Обучаемых параметров: {trainable_params:,} ({100*trainable_params/total_params:.1f}%)")

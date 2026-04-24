@@ -1,0 +1,14 @@
+# Сохранение полной модели
+torch.save({
+    'model_state_dict': model.state_dict(),
+    'class_names': train_dataset.classes,
+    'num_classes': num_classes,
+    'val_accuracy': history['best_acc']
+}, 'models/bird_classifier_complete.pth')
+
+
+print("\n" + "="*60)
+print("ЗАВЕРШЕНИЕ РАБОТЫ")
+print("="*60)
+print("Модель сохранена в папку 'models/'")
+print(f"Лучшая точность на валидации: {history['best_acc']:.2f}%")

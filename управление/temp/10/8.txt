@@ -1,0 +1,10 @@
+print("\n" + "="*60)
+print("НАЧАЛО ОБУЧЕНИЯ")
+print("="*60)
+
+
+# Обучение (15 эпох для демонстрации)
+history = train_model(
+    model, train_loader, val_loader, criterion, 
+    optimizer, scheduler, epochs=15, device=device
+)

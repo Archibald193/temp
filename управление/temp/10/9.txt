@@ -1,0 +1,36 @@
+print("\n" + "="*60)
+print("ВИЗУАЛИЗАЦИЯ РЕЗУЛЬТАТОВ")
+print("="*60)
+
+
+# Построение графиков
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+
+# График потерь
+axes[0].plot(history['train_loss'], label='Train Loss', marker='o')
+axes[0].plot(history['val_loss'], label='Validation Loss', marker='s')
+axes[0].set_xlabel('Epoch')
+axes[0].set_ylabel('Loss')
+axes[0].set_title('Динамика потерь (Loss)')
+axes[0].legend()
+axes[0].grid(True)
+
+
+# График точности
+axes[1].plot(history['train_acc'], label='Train Accuracy', marker='o')
+axes[1].plot(history['val_acc'], label='Validation Accuracy', marker='s')
+axes[1].set_xlabel('Epoch')
+axes[1].set_ylabel('Accuracy (%)')
+axes[1].set_title('Динамика точности (Accuracy)')
+axes[1].legend()
+axes[1].grid(True)
+
+
+plt.tight_layout()
+plt.savefig('training_history.png', dpi=150)
+plt.show()
+
+
+print(f"\nИтоговая точность на валидации: {history['val_acc'][-1]:.2f}%")
+print(f"Лучшая точность на валидации: {history['best_acc']:.2f}%")
